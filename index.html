@@ -465,7 +465,13 @@ let _charts = {};    // Chart.js instances
 
 /* ── Storage ─────────────────────────── */
 const dKey  = (y,m,d) => `inc_${y}_${String(m+1).padStart(2,'0')}_${String(d).padStart(2,'0')}`;
-const getD  = (y,m,d)   => JSON.parse(localStorage.getItem(dKey(y,m,d)) || 'null');
+function getD(y,m,d) {
+  const raw = JSON.parse(localStorage.getItem(dKey(y,m,d)) || 'null');
+  if (!raw) return null;
+  // legacy format: array → take first element
+  if (Array.isArray(raw)) return raw.length ? raw[0] : null;
+  return raw;
+}
 const saveD = (y,m,d,v) => v
   ? localStorage.setItem(dKey(y,m,d), JSON.stringify(v))
   : localStorage.removeItem(dKey(y,m,d));
@@ -860,7 +866,14 @@ function importJSON(input){
   reader.onload=ev=>{
     try{
       const data=JSON.parse(ev.target.result);let count=0;
-      Object.entries(data).forEach(([k,v])=>{if(k.startsWith('inc_')){localStorage.setItem(k,JSON.stringify(v));count++;}});
+      Object.entries(data).forEach(([k,v])=>{
+        if(!k.startsWith('inc_'))return;
+        // normalize legacy array format → single object
+        let entry = Array.isArray(v) ? (v.length ? v[0] : null) : v;
+        if(!entry)return;
+        localStorage.setItem(k, JSON.stringify(entry));
+        count++;
+      });
       renderCal();toast(`${count}일 데이터 복원`,'ok');closeDataModal();
     }catch{toast('파일을 읽을 수 없어요','err');}
     input.value='';
