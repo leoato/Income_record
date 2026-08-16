@@ -1206,6 +1206,53 @@ function areaChartSVG(list, ariaLabel){
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block;margin-top:12px" role="img" aria-label="${ariaLabel||'추이 그래프'}">${s}</svg>`;
 }
 
+/* 자산 구성 도넛 — 5주머니 비중 (팔레트: dataviz validator ALL PASS) */
+const COMP_SLICES = [
+  { g:'유동성 · 비상금',   label:'비상금',      color:'#06A561' },
+  { g:'강제저축',          label:'강제저축',    color:'#B45309' },
+  { g:'유동성 · 적금재원', label:'적금재원',    color:'#0D9488' },
+  { g:'투자',              label:'투자',        color:'#3182F6' },
+  { g:'유동성 · 일상',     label:'일상 유동성', color:'#DB2777' },
+];
+function compositionHTML(assets){
+  let latest = null;
+  for(let i=assets.length-1;i>=0;i--){ if(assets[i].accounts){ latest=assets[i]; break; } }
+  if(!latest) return '';
+  const items = COMP_SLICES.map(s=>({ ...s, v: latest.accounts.filter(a=>a.g===s.g).reduce((sum,a)=>sum+a.v,0) }));
+  const known = items.reduce((s,x)=>s+x.v,0);
+  const totalAcc = latest.accounts.reduce((s,a)=>s+a.v,0);
+  if(totalAcc - known > 0) items.push({ label:'기타(미분류)', color:'#8B95A1', v: totalAcc-known });
+  const live = items.filter(x=>x.v>0);
+  if(!live.length) return '';
+  const total = live.reduce((s,x)=>s+x.v,0);
+  /* 도넛 (링 세그먼트 + 2px 흰 갭) */
+  const cx=70, cy=70, r=52, W=26, C=2*Math.PI*r;
+  let acc=0, seg='';
+  live.forEach(it=>{
+    const frac = it.v/total;
+    const dash = Math.max(0.5, frac*C - 2.5);
+    seg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" style="stroke:${it.color}" stroke-width="${W}" stroke-dasharray="${dash.toFixed(2)} ${(C-dash).toFixed(2)}" stroke-dashoffset="${(-acc*C).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"/>`;
+    acc += frac;
+  });
+  const donut = `<svg viewBox="0 0 140 140" style="width:132px;flex-shrink:0" role="img" aria-label="자산 구성 비중 도넛 차트">
+    ${seg}
+    <text x="${cx}" y="${cy-2}" text-anchor="middle" font-size="16" font-weight="800" style="fill:var(--ink)">${fmtMan(total)}</text>
+    <text x="${cx}" y="${cy+14}" text-anchor="middle" font-size="9" style="fill:var(--ink3)">총자산</text>
+  </svg>`;
+  const legend = live.map(it=>`
+    <div style="display:flex;align-items:center;gap:7px;padding:4.5px 0">
+      <span style="width:10px;height:10px;border-radius:3px;background:${it.color};flex-shrink:0"></span>
+      <span style="flex:1;font-size:12px;font-weight:600;color:var(--ink2)">${esc(it.label)}</span>
+      <b style="font-size:12.5px">${(it.v/total*100).toFixed(1)}%</b>
+      <span style="font-size:11px;color:var(--ink3);width:52px;text-align:right">${fmtMan(it.v)}</span>
+    </div>`).join('');
+  return `<div class="sec-title">자산 구성 <span class="s">${ymLabel(latest.ym)} 말 기준</span></div>
+  <div class="card" style="display:flex;align-items:center;gap:14px">
+    ${donut}
+    <div style="flex:1;min-width:0">${legend}</div>
+  </div>`;
+}
+
 /* 목표 카드 — 시드의 mf_goals: [{label, account|group, target, due?}] */
 function goalsHTML(assets){
   const goals = LS.get('mf_goals')||[];
@@ -1286,6 +1333,7 @@ function renderAsset(){
       <div class="goal-track"><div class="goal-fill emerg" style="width:${emerg!=null?Math.min(100,emerg/emergGoal()*100):0}%"></div></div>
       <div style="font-size:10.5px;color:var(--ink3)">목표 ${fmtMan(emergGoal())} · 불가침</div></div>
   </div>`;
+  h += compositionHTML(assets);
   h += goalsHTML(assets);
   const cm = LS.get('mf_chartmode','line');
   const span = cm==='line' ? Math.min(12, assets.length) : Math.min(6, assets.length);
