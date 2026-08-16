@@ -426,6 +426,15 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
   <div id="dtBody"></div>
 </div>
 
+<!-- ══════════ 오버레이: 계좌별 추이 ══════════ -->
+<div class="ovpage" id="ov-acctd">
+  <div class="ov-hdr">
+    <button class="back-btn" onclick="closeOv('ov-acctd')">‹</button>
+    <div><div class="t" id="adTitle"></div><div class="s" id="adSub"></div></div>
+  </div>
+  <div id="adBody"></div>
+</div>
+
 <!-- ══════════ 오버레이: 브리핑 상세 (官報) ══════════ -->
 <div class="ovpage" id="ov-brief">
   <div class="ov-hdr">
@@ -1104,17 +1113,17 @@ function renderAcct(){
     h += `<div class="acc-group"><div class="acc-gh"><span>${esc(g)}</span><span>${sub?fmt(sub)+'원':''}</span></div><div class="acc-tbl">`;
     list.forEach(r=>{
       const bal = balBy[normName(r.n)];
-      h += `<div class="acc-r">
+      h += `<div class="acc-r" style="cursor:pointer" data-n="${esc(r.n)}" onclick="openAcctDetail(this.dataset.n)">
         <div class="an">${esc(r.n)}${r.note?`<span class="note">${esc(r.note)}</span>`:''}</div>
         <div style="display:flex;align-items:center;gap:10px">
           <div class="av" style="color:${bal===undefined?'var(--ink4)':'var(--ink)'}">${bal===undefined?'—':fmt(bal)}</div>
-          <button onclick="deleteAcctReg(${r.idx})" style="background:none;border:none;color:var(--ink4);font-size:13px;padding:2px">✕</button>
+          <button onclick="event.stopPropagation();deleteAcctReg(${r.idx})" style="background:none;border:none;color:var(--ink4);font-size:13px;padding:2px">✕</button>
         </div>
       </div>`;
     });
     h += `</div></div>`;
   });
-  h += `<div style="font-size:11px;color:var(--ink3);line-height:1.6;padding:2px 4px">잔액은 최근 정산 스냅샷 기준이에요. '—'는 아직 정산에서 안 잡힌 계좌 — 다음 정산 때 AI가 캡처에서 찾아 채웁니다.</div>`;
+  h += `<div style="font-size:11px;color:var(--ink3);line-height:1.6;padding:2px 4px">계좌를 탭하면 월별 잔액 추이가 보여요. 잔액은 최근 정산 스냅샷 기준 — '—'는 아직 정산에서 안 잡힌 계좌로, 다음 정산 때 AI가 캡처에서 찾아 채웁니다.</div>`;
   $('acctBody').innerHTML = h;
 }
 function openAcctSheet(){
@@ -1133,6 +1142,31 @@ function addAccount(){
   closeAllSheets(); renderAcct();
   toast(`'${n}' 등록 — 다음 정산 때 AI가 우선 매칭해요`);
 }
+function openAcctDetail(name){
+  const series = [];
+  allAssetYms().forEach(ym=>{
+    const a = getAsset(ym); if(!a.accounts) return;
+    const hit = a.accounts.find(x=>normName(x.n)===normName(name));
+    if(hit) series.push({ ym, v:hit.v });
+  });
+  if(!series.length){ toast('아직 정산에 잡힌 기록이 없어요 — 다음 정산 후 볼 수 있어요'); return; }
+  $('adTitle').textContent = name;
+  $('adSub').textContent = `월별 잔액 · ${series.length}개월`;
+  let h = '';
+  if(series.length>=2) h += `<div class="card" style="padding-top:8px">${areaChartSVG(series, name+' 월별 잔액 추이')}</div>`;
+  h += `<div class="mlist">`;
+  [...series].reverse().forEach((s,i,arr)=>{
+    const p = arr[i+1];
+    const dd = p ? s.v-p.v : null;
+    h += `<div class="mrow" style="cursor:default">
+      <div class="my">${ymLabel(s.ym)}</div>
+      <div style="text-align:right"><div class="mv">${fmtWon(s.v)}</div><div class="md" style="color:${dd===null?'var(--ink3)':dd>=0?'var(--up)':'var(--blue)'}">${dd===null?'—':(dd>=0?'+':'')+fmt(dd)}</div></div>
+    </div>`;
+  });
+  h += `</div>`;
+  $('adBody').innerHTML = h;
+  openOv('ov-acctd');
+}
 function deleteAcctReg(i){
   const reg = getAcctReg();
   const r = reg[i]; if(!r) return;
@@ -1147,6 +1181,58 @@ function deleteAcctReg(i){
 ════════════════════════════════════════════ */
 const CAT = { liq:{c:'var(--c-liq)',l:'유동성'}, inv:{c:'var(--c-inv)',l:'투자'}, forced:{c:'var(--c-forced)',l:'강제저축'} };
 function setChartMode(m){ LS.set('mf_chartmode', m); renderAsset(); }
+
+/* 단일 시리즈 영역 그래프 — 순자산 곡선·계좌별 추이 공용 */
+function areaChartSVG(list, ariaLabel){
+  const W=320, H=104, P={l:6,r:6,t:12,b:16};
+  const vals = list.map(p=>p.v);
+  let mn = Math.min(...vals), mx = Math.max(...vals);
+  let pad = (mx-mn)*0.15;
+  if(pad<=0) pad = Math.max(mx*0.1, 1);
+  const y0 = Math.max(0, mn-pad), y1 = mx+pad;
+  const x = i=>P.l + (W-P.l-P.r) * (list.length===1 ? 0.5 : i/(list.length-1));
+  const y = v=>P.t + (H-P.t-P.b) * (1 - (v-y0)/(y1-y0));
+  const pts = list.map((p,i)=>`${x(i).toFixed(1)},${y(p.v).toFixed(1)}`);
+  let s = `<polygon points="${P.l},${H-P.b} ${pts.join(' ')} ${(W-P.r).toFixed(1)},${H-P.b}" style="fill:var(--blue-bg)"/>`;
+  s += `<polyline points="${pts.join(' ')}" style="fill:none;stroke:var(--blue);stroke-width:2;stroke-linejoin:round;stroke-linecap:round"/>`;
+  s += `<circle cx="${x(list.length-1).toFixed(1)}" cy="${y(list[list.length-1].v).toFixed(1)}" r="3.4" style="fill:var(--blue);stroke:var(--paper);stroke-width:1.5"/>`;
+  const li = [0, Math.floor((list.length-1)/2), list.length-1];
+  [...new Set(li)].forEach(i=>{
+    s += `<text x="${x(i).toFixed(1)}" y="${H-3}" text-anchor="${i===0?'start':i===list.length-1?'end':'middle'}" font-size="8.5" style="fill:var(--ink4)">${list[i].ym.slice(2).replace('-','.')}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block;margin-top:12px" role="img" aria-label="${ariaLabel||'추이 그래프'}">${s}</svg>`;
+}
+
+/* 목표 카드 — 시드의 mf_goals: [{label, account|group, target, due?}] */
+function goalsHTML(assets){
+  const goals = LS.get('mf_goals')||[];
+  if(!goals.length) return '';
+  let latest = null;
+  for(let i=assets.length-1;i>=0;i--){ if(assets[i].accounts){ latest=assets[i]; break; } }
+  if(!latest) return '';
+  let h = `<div class="sec-title">목표 <span class="s">${ymLabel(latest.ym)} 말 기준</span></div>`;
+  goals.forEach(g=>{
+    let cur = 0;
+    if(g.group) cur = latest.accounts.filter(a=>a.g===g.group).reduce((s,a)=>s+a.v,0);
+    else if(g.account) cur = latest.accounts.filter(a=>normName(a.n)===normName(g.account)).reduce((s,a)=>s+a.v,0);
+    const pct = Math.min(100, cur/g.target*100);
+    const dd = g.due ? dday(g.due) : null;
+    const remain = Math.max(0, g.target-cur);
+    h += `<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+        <div style="font-size:14px;font-weight:800">${esc(g.label)}</div>
+        ${dd!==null?`<span class="badge${dd<=14&&dd>=0?' dark':''}">${dd>0?'D-'+dd:dd===0?'D-DAY':'D+'+(-dd)}</span>`:''}
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--ink2);margin-bottom:7px">
+        <span><b style="font-size:15.5px;color:var(--ink)">${fmtMan(cur)}</b> / ${fmtMan(g.target)}</span>
+        <span style="font-weight:600">${remain?`남은 ${fmtMan(remain)}`:'달성 ✓'}</span>
+      </div>
+      <div class="goal-track"><div class="goal-fill${remain?'':' emerg'}" style="width:${pct}%"></div></div>
+      <div style="font-size:10.5px;color:var(--ink3);margin-top:4px">${pct.toFixed(1)}%</div>
+    </div>`;
+  });
+  return h;
+}
 function lineChartSVG(assets){
   const data = assets.slice(-12);
   const W=340, H=190, P={l:36,r:10,t:12,b:22};
@@ -1187,6 +1273,7 @@ function renderAsset(){
     <div class="card-lbl">순자산 · ${ymLabel(latest.ym)} 말</div>
     <div class="networth">${fmtWon(latest.total)}</div>
     ${prev?`<div class="delta ${d>=0?'up':'down'}">${d>=0?'▲':'▼'} ${fmt(Math.abs(d))}원 (${d>=0?'+':''}${pct}%)</div>`:''}
+    ${assets.length>=3 ? areaChartSVG(assets.map(a=>({ym:a.ym,v:a.total})), '순자산 전체 추이') : ''}
   </div>
   <div class="kpi2">
     <div class="card" style="margin:0"><div class="card-lbl">1억 목표</div><div style="font-size:18px;font-weight:800">${goalPct.toFixed(1)}%</div>
@@ -1196,6 +1283,7 @@ function renderAsset(){
       <div class="goal-track"><div class="goal-fill emerg" style="width:${emerg!=null?Math.min(100,emerg/emergGoal()*100):0}%"></div></div>
       <div style="font-size:10.5px;color:var(--ink3)">목표 ${fmtMan(emergGoal())} · 불가침</div></div>
   </div>`;
+  h += goalsHTML(assets);
   const cm = LS.get('mf_chartmode','line');
   const span = cm==='line' ? Math.min(12, assets.length) : Math.min(6, assets.length);
   h += `<div class="sec-title" style="justify-content:space-between"><span>3분류 추이 <span class="s">최근 ${span}개월</span></span>
