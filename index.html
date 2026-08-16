@@ -494,7 +494,7 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
     <div class="card" style="padding:12px 18px">
       <div class="ext-r" style="border:none">
         <div class="en"><b>캡처에 표시된 총 자산</b><span class="note">판독값 — 잘못 읽혔으면 수정</span></div>
-        <input type="number" id="extTotal" inputmode="numeric" oninput="checkSum()">
+        <input type="text" id="extTotal" inputmode="numeric" oninput="fmtInput(this);checkSum()">
       </div>
     </div>
     <div class="verify ok" id="verifyBox"></div>
@@ -549,7 +549,7 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
   <div class="sh-title" id="incDate"></div>
   <div class="sh-sub">수입 기록</div>
   <div class="srcrow" id="incSrcRow"></div>
-  <input class="inp big" id="incAmt" type="number" inputmode="numeric" placeholder="금액 입력 (원)">
+  <input class="inp big" id="incAmt" type="text" inputmode="numeric" placeholder="금액 입력 (원)" oninput="fmtInput(this)">
   <input class="inp" id="incMemo" type="text" placeholder="메모 (선택)">
   <div class="btnrow">
     <button class="del-btn" id="incDel" onclick="deleteIncome()"><svg viewBox="0 0 24 24" style="width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.7"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13M10 11v5M14 11v5"/></svg></button>
@@ -667,6 +667,9 @@ function fmtAmt(n){
   return n.toLocaleString();
 }
 const fmtMan = n=>{ const m = Math.round((Number(n)||0)/10000); return m ? m.toLocaleString()+'만' : '0'; };
+/* 쉼표 표시 숫자 입력: type=text + inputmode=numeric 조합용 */
+const numOf = v=>parseInt(String(v??'').replace(/[^\d]/g,''))||0;
+function fmtInput(el){ const n = numOf(el.value); el.value = n ? n.toLocaleString() : ''; }
 const ymLabel = ym=>{ const [y,m]=ym.split('-'); return `${y}년 ${+m}월`; };
 const ymNow = ()=>{ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; };
 function ymShift(ym, k){ let [y,m]=ym.split('-').map(Number); m+=k; while(m<1){m+=12;y--;} while(m>12){m-=12;y++;} return `${y}-${String(m).padStart(2,'0')}`; }
@@ -998,7 +1001,7 @@ function openIncome(y,m,d){
   const entry = Array.isArray(e) ? (e[0]||null) : e;
   UI.incSrc = entry?.job || null;
   $('incDate').textContent = `${y}년 ${m+1}월 ${d}일`;
-  $('incAmt').value = entry?.amount || '';
+  $('incAmt').value = entry?.amount ? fmt(entry.amount) : '';
   $('incMemo').value = entry?.memo || '';
   $('incDel').style.visibility = entry ? 'visible' : 'hidden';
   renderIncSrc();
@@ -1012,7 +1015,7 @@ function renderIncSrc(){
 function pickSrc(id){ UI.incSrc=id; renderIncSrc(); $('incAmt').focus(); }
 function saveIncome(){
   if(!UI.incSrc){ toast('수입원을 선택해주세요'); return; }
-  const amt = parseInt($('incAmt').value)||0;
+  const amt = numOf($('incAmt').value);
   if(!amt){ toast('금액을 입력해주세요'); return; }
   const {y,m,d} = UI.incDate;
   LS.set(incKey(y,m,d), { job:UI.incSrc, amount:amt, memo:$('incMemo').value.trim() });
@@ -1633,19 +1636,19 @@ function renderExt(){
     const pv = prevBy[a.n.replace(/\s/g,'')];
     const deltaNote = pv!==undefined ? ` · 전월 ${fmt(pv)} (${a.v-pv>=0?'+':''}${fmt(a.v-pv)})` : '';
     return `<div class="ext-r"><div class="en">${esc(a.n)}<span class="note">${esc(a.g)}${a.note?' · '+esc(a.note):''}${deltaNote}</span></div>
-     <input type="number" inputmode="numeric" value="${a.v}" data-i="${i}" oninput="checkSum()"></div>`;
+     <input type="text" inputmode="numeric" value="${fmt(a.v)}" data-i="${i}" oninput="fmtInput(this);checkSum()"></div>`;
   }).join('');
-  $('extTotal').value = WZ.ext.total ?? '';
+  $('extTotal').value = WZ.ext.total!=null ? fmt(WZ.ext.total) : '';
   checkSum();
 }
 function extSum(){
   let sum = 0;
-  document.querySelectorAll('#extTable input').forEach(inp=>sum+=parseInt(inp.value)||0);
+  document.querySelectorAll('#extTable input').forEach(inp=>sum+=numOf(inp.value));
   return sum;
 }
 function checkSum(){
   const sum = extSum();
-  const target = parseInt($('extTotal').value);
+  const target = $('extTotal').value.trim()==='' ? NaN : numOf($('extTotal').value);
   const box = $('verifyBox'), next = $('wz4next');
   if(!target && target!==0){
     box.className='verify bad';
@@ -1666,7 +1669,7 @@ function checkSum(){
 }
 /* 확인 완료 → 자산 저장 → 특이사항 */
 function confirmExtract(){
-  document.querySelectorAll('#extTable input').forEach(inp=>{ WZ.ext.accounts[+inp.dataset.i].v = parseInt(inp.value)||0; });
+  document.querySelectorAll('#extTable input').forEach(inp=>{ WZ.ext.accounts[+inp.dataset.i].v = numOf(inp.value); });
   const accounts = WZ.ext.accounts;
   const sumBy = pred=>accounts.filter(pred).reduce((s,a)=>s+a.v,0);
   const liq = sumBy(a=>String(a.g).startsWith('유동성'));
