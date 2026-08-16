@@ -57,7 +57,7 @@ input,textarea,select{font-family:inherit;}
 .amt-pill.on{background:var(--paper);color:var(--ink);box-shadow:var(--shadow);}
 
 /* tab bar */
-.tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:var(--paper);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(4,1fr);z-index:40;padding-bottom:env(safe-area-inset-bottom,0);}
+.tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:var(--paper);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);z-index:40;padding-bottom:env(safe-area-inset-bottom,0);}
 .tab{padding:11px 0 9px;background:none;border:none;color:var(--ink4);font-size:10.5px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:3px;}
 .tab svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.8;}
 .tab.on{color:var(--blue);font-weight:800;}
@@ -393,7 +393,16 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
   <div id="assetBody"></div>
 </div>
 
-<!-- ══════════ 탭4 장관 ══════════ -->
+<!-- ══════════ 탭4 계좌 ══════════ -->
+<div class="page" id="pg-acct">
+  <div class="hdr">
+    <div><h1>계좌</h1><div class="sub" id="acctSub">카테고리별 정리</div></div>
+    <button class="btn sm" onclick="openAcctSheet()">＋ 계좌 추가</button>
+  </div>
+  <div id="acctBody"></div>
+</div>
+
+<!-- ══════════ 탭5 장관 ══════════ -->
 <div class="page" id="pg-min">
   <div class="hdr"><div><h1>재무부 장관</h1><div class="sub">월말 정산 · 국정 브리핑</div></div></div>
   <div id="minBody"></div>
@@ -404,6 +413,7 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
   <button class="tab on" id="tab-cal" onclick="go('cal')"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>캘린더</button>
   <button class="tab" id="tab-an" onclick="go('an')"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M21 20H3"/></svg>분석</button>
   <button class="tab" id="tab-asset" onclick="go('asset')"><svg viewBox="0 0 24 24"><path d="M3 10l9-6 9 6M5 10v9M12 10v9M19 10v9M3 20h18"/></svg>자산</button>
+  <button class="tab" id="tab-acct" onclick="go('acct')"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18M7 15h4"/></svg>계좌</button>
   <button class="tab" id="tab-min" onclick="go('min')"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M6 21v-1a6 6 0 0 1 12 0v1"/></svg>장관</button>
 </nav>
 
@@ -567,6 +577,17 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
     <button class="btn ghost" style="margin-bottom:8px" onclick="exportCSV()">자산 CSV 내보내기</button>
     <button class="btn ghost" style="color:var(--up)" onclick="confirmClear()">전체 삭제</button>
   </div>
+</div>
+
+<!-- ══════════ 시트: 계좌 추가 ══════════ -->
+<div class="sheet" id="sh-acct">
+  <div class="sh-handle"></div>
+  <div class="sh-title">계좌 추가</div>
+  <div class="sh-sub">등록한 계좌는 다음 정산 때 AI가 캡처에서 우선적으로 찾아 매칭해요</div>
+  <input class="inp" id="acctName" type="text" placeholder="계좌 이름 (토스에 보이는 이름 그대로)">
+  <select class="inp" id="acctGroup" style="appearance:auto"></select>
+  <input class="inp" id="acctNote" type="text" placeholder="메모 (선택 — 예: 만기일, 용도)">
+  <button class="btn" onclick="addAccount()">추가</button>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -843,7 +864,7 @@ function extractSystem(){
 - 잔액 0원이어도 기존 주요 계좌(만기 적금, 청산한 주식계좌 등)는 포함한다(추적용). 카드 결제예정액·대출·광고는 제외.
 - 화면에 표시된 '총 자산' 숫자를 total_displayed로 보고한다.
 - 계좌 그룹: '유동성 · 일상'(입출금·생활비), '유동성 · 비상금'(비상금 성격 CMA·적금), '유동성 · 적금재원'(목적자금), '강제저축'(청약·적금), '투자'(ISA·연금·주식). 성격에 맞게 분류한다.
-${extractHint() ? '\n[이 사용자의 계좌 분류 기준]\n'+extractHint() : ''}`;
+${extractHint() ? '\n[이 사용자의 계좌 분류 기준]\n'+extractHint() : ''}${(LS.get('mf_accounts')||[]).length ? '\n[알려진 계좌 목록 — 캡처에서 이 이름들을 우선 찾아 같은 이름·그룹으로 보고]\n'+(LS.get('mf_accounts')||[]).map(r=>`- ${r.g}: ${r.n}`).join('\n') : ''}`;
 }
 
 const BRIEF_SCHEMA = {
@@ -910,13 +931,14 @@ async function callBatchBrief(){
 const UI = { tab:'cal', calY:0, calM:0, anRange:0, incDate:null, incSrc:null };
 function go(tab){
   UI.tab = tab;
-  ['cal','an','asset','min'].forEach(k=>{
+  ['cal','an','asset','acct','min'].forEach(k=>{
     $('pg-'+k).classList.toggle('on',k===tab);
     $('tab-'+k).classList.toggle('on',k===tab);
   });
   if(tab==='cal') renderCal();
   if(tab==='an') renderAn();
   if(tab==='asset') renderAsset();
+  if(tab==='acct') renderAcct();
   if(tab==='min') renderMin();
 }
 function openSheet(id){ $('bd').classList.add('open'); $(id).classList.add('open'); }
@@ -1040,9 +1062,118 @@ function renderAn(){
 }
 
 /* ════════════════════════════════════════════
+   계좌 등록부 — 표시용 + AI 판독 힌트
+════════════════════════════════════════════ */
+const normName = n=>String(n||'').replace(/\s/g,'');
+function getAcctReg(){
+  let reg = LS.get('mf_accounts');
+  if(!reg){
+    /* 최초: 가장 최근 정산 스냅샷의 계좌로 자동 구성 */
+    const yms = allAssetYms();
+    for(let i=yms.length-1;i>=0;i--){ const a=getAsset(yms[i]); if(a.accounts){ reg = a.accounts.map(x=>({n:x.n,g:x.g,note:x.note})); break; } }
+    reg = reg || [];
+    LS.set('mf_accounts', reg);
+  }
+  return reg;
+}
+function syncAcctReg(accounts){
+  const reg = getAcctReg();
+  let added = 0;
+  accounts.forEach(a=>{ if(!reg.find(r=>normName(r.n)===normName(a.n))){ reg.push({n:a.n,g:a.g}); added++; } });
+  if(added) LS.set('mf_accounts', reg);
+}
+function renderAcct(){
+  const reg = getAcctReg();
+  /* 최근 정산 스냅샷에서 잔액 매칭 */
+  const yms = allAssetYms();
+  let latest = null;
+  for(let i=yms.length-1;i>=0;i--){ const a=getAsset(yms[i]); if(a.accounts){ latest=a; break; } }
+  const balBy = {};
+  (latest?.accounts||[]).forEach(a=>{ balBy[normName(a.n)] = a.v; });
+  $('acctSub').textContent = latest ? `${ymLabel(latest.ym)} 말 잔액 기준` : '카테고리별 정리';
+  if(!reg.length){
+    $('acctBody').innerHTML = '<div class="card" style="text-align:center;color:var(--ink3);padding:40px 0">등록된 계좌가 없어요<br>계좌 추가 버튼으로 등록하거나, 첫 정산을 하면 자동으로 채워져요</div>';
+    return;
+  }
+  let h = '';
+  const groupsInUse = [...GROUPS, ...[...new Set(reg.map(r=>r.g))].filter(g=>!GROUPS.includes(g))];
+  groupsInUse.forEach(g=>{
+    const list = reg.map((r,i)=>({...r,idx:i})).filter(r=>r.g===g);
+    if(!list.length) return;
+    const sub = list.reduce((s,r)=>s+(balBy[normName(r.n)]||0),0);
+    h += `<div class="acc-group"><div class="acc-gh"><span>${esc(g)}</span><span>${sub?fmt(sub)+'원':''}</span></div><div class="acc-tbl">`;
+    list.forEach(r=>{
+      const bal = balBy[normName(r.n)];
+      h += `<div class="acc-r">
+        <div class="an">${esc(r.n)}${r.note?`<span class="note">${esc(r.note)}</span>`:''}</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="av" style="color:${bal===undefined?'var(--ink4)':'var(--ink)'}">${bal===undefined?'—':fmt(bal)}</div>
+          <button onclick="deleteAcctReg(${r.idx})" style="background:none;border:none;color:var(--ink4);font-size:13px;padding:2px">✕</button>
+        </div>
+      </div>`;
+    });
+    h += `</div></div>`;
+  });
+  h += `<div style="font-size:11px;color:var(--ink3);line-height:1.6;padding:2px 4px">잔액은 최근 정산 스냅샷 기준이에요. '—'는 아직 정산에서 안 잡힌 계좌 — 다음 정산 때 AI가 캡처에서 찾아 채웁니다.</div>`;
+  $('acctBody').innerHTML = h;
+}
+function openAcctSheet(){
+  $('acctName').value=''; $('acctNote').value='';
+  $('acctGroup').innerHTML = GROUPS.map(g=>`<option value="${g}">${g}</option>`).join('');
+  openSheet('sh-acct');
+}
+function addAccount(){
+  const n = $('acctName').value.trim();
+  if(!n){ toast('계좌 이름을 입력해주세요'); return; }
+  const reg = getAcctReg();
+  if(reg.find(r=>normName(r.n)===normName(n))){ toast('이미 등록된 계좌예요'); return; }
+  const note = $('acctNote').value.trim();
+  reg.push({ n, g:$('acctGroup').value, ...(note?{note}:{}) });
+  LS.set('mf_accounts', reg);
+  closeAllSheets(); renderAcct();
+  toast(`'${n}' 등록 — 다음 정산 때 AI가 우선 매칭해요`);
+}
+function deleteAcctReg(i){
+  const reg = getAcctReg();
+  const r = reg[i]; if(!r) return;
+  if(!confirm(`'${r.n}' 계좌를 목록에서 뺄까요?\n과거 정산 기록에는 영향이 없어요.`)) return;
+  reg.splice(i,1);
+  LS.set('mf_accounts', reg);
+  renderAcct(); toast('계좌 목록에서 제거됨');
+}
+
+/* ════════════════════════════════════════════
    자산
 ════════════════════════════════════════════ */
 const CAT = { liq:{c:'var(--c-liq)',l:'유동성'}, inv:{c:'var(--c-inv)',l:'투자'}, forced:{c:'var(--c-forced)',l:'강제저축'} };
+function setChartMode(m){ LS.set('mf_chartmode', m); renderAsset(); }
+function lineChartSVG(assets){
+  const data = assets.slice(-12);
+  const W=340, H=190, P={l:36,r:10,t:12,b:22};
+  const series = [['liq','var(--c-liq)'],['inv','var(--c-inv)'],['forced','var(--c-forced)']];
+  const maxV = Math.max(...data.flatMap(a=>[a.liq,a.inv,a.forced]), 1);
+  const yMax = Math.ceil(maxV/2000000)*2000000;
+  const x = i=>P.l + (W-P.l-P.r) * (data.length===1 ? 0.5 : i/(data.length-1));
+  const y = v=>P.t + (H-P.t-P.b) * (1 - v/yMax);
+  let s = '';
+  [0, yMax/2, yMax].forEach(gv=>{
+    s += `<line x1="${P.l}" y1="${y(gv)}" x2="${W-P.r}" y2="${y(gv)}" style="stroke:var(--line2);stroke-width:1"/>`;
+    s += `<text x="${P.l-5}" y="${y(gv)+3}" text-anchor="end" font-size="8.5" style="fill:var(--ink4)">${gv?Math.round(gv/10000).toLocaleString()+'만':'0'}</text>`;
+  });
+  const step = Math.max(1, Math.ceil(data.length/6));
+  data.forEach((a,i)=>{
+    if(i%step===0 || i===data.length-1)
+      s += `<text x="${x(i)}" y="${H-6}" text-anchor="middle" font-size="8.5" style="fill:var(--ink3)">${+a.ym.slice(5)}월</text>`;
+  });
+  series.forEach(([k,color])=>{
+    const pts = data.map((a,i)=>`${x(i).toFixed(1)},${y(a[k]).toFixed(1)}`).join(' ');
+    s += `<polyline points="${pts}" style="fill:none;stroke:${color};stroke-width:2;stroke-linejoin:round;stroke-linecap:round"/>`;
+    data.forEach((a,i)=>{
+      s += `<circle cx="${x(i).toFixed(1)}" cy="${y(a[k]).toFixed(1)}" r="${i===data.length-1?3.4:2.2}" style="fill:${color};stroke:var(--paper);stroke-width:1.5"/>`;
+    });
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block" role="img" aria-label="3분류 월별 추이 꺾은선 그래프">${s}</svg>`;
+}
 function renderAsset(){
   const yms = allAssetYms();
   if(!yms.length){ $('assetBody').innerHTML='<div class="card" style="text-align:center;color:var(--ink3);padding:40px 0">자산 데이터가 없어요<br>설정 → 백업 복원으로 불러오거나 장관 탭에서 정산하세요</div>'; return; }
@@ -1064,18 +1195,28 @@ function renderAsset(){
     <div class="card" style="margin:0"><div class="card-lbl">비상금 충족률</div><div style="font-size:18px;font-weight:800">${emerg!=null?(emerg/emergGoal()*100).toFixed(1)+'%':'—'}</div>
       <div class="goal-track"><div class="goal-fill emerg" style="width:${emerg!=null?Math.min(100,emerg/emergGoal()*100):0}%"></div></div>
       <div style="font-size:10.5px;color:var(--ink3)">목표 ${fmtMan(emergGoal())} · 불가침</div></div>
-  </div>
-  <div class="sec-title">3분류 추이 <span class="s">최근 6개월</span></div>
+  </div>`;
+  const cm = LS.get('mf_chartmode','line');
+  const span = cm==='line' ? Math.min(12, assets.length) : Math.min(6, assets.length);
+  h += `<div class="sec-title" style="justify-content:space-between"><span>3분류 추이 <span class="s">최근 ${span}개월</span></span>
+    <span style="display:flex;gap:4px">
+      <button class="btn sm${cm==='line'?'':' ghost'}" style="padding:5px 10px;font-size:11px;border-radius:8px" onclick="setChartMode('line')">추이</button>
+      <button class="btn sm${cm==='stack'?'':' ghost'}" style="padding:5px 10px;font-size:11px;border-radius:8px" onclick="setChartMode('stack')">구성</button>
+    </span></div>
   <div class="card">`;
-  assets.slice(-6).forEach(m=>{
-    const t=m.total;
-    h += `<div class="stack-row"><div class="yl">${+m.ym.slice(5)}월</div>
-      <div class="stack-track">
-        <div class="sg" style="width:${m.liq/t*100}%;background:${CAT.liq.c}"></div>
-        <div class="sg" style="width:${m.inv/t*100}%;background:${CAT.inv.c}"></div>
-        <div class="sg" style="width:${m.forced/t*100}%;background:${CAT.forced.c}"></div>
-      </div><div class="tv">${fmtMan(t)}</div></div>`;
-  });
+  if(cm==='line'){
+    h += lineChartSVG(assets);
+  }else{
+    assets.slice(-6).forEach(m=>{
+      const t=m.total;
+      h += `<div class="stack-row"><div class="yl">${+m.ym.slice(5)}월</div>
+        <div class="stack-track">
+          <div class="sg" style="width:${m.liq/t*100}%;background:${CAT.liq.c}"></div>
+          <div class="sg" style="width:${m.inv/t*100}%;background:${CAT.inv.c}"></div>
+          <div class="sg" style="width:${m.forced/t*100}%;background:${CAT.forced.c}"></div>
+        </div><div class="tv">${fmtMan(t)}</div></div>`;
+    });
+  }
   h += `<div class="legend">
     <div class="li"><span class="sw" style="background:${CAT.liq.c}"></span>유동성</div>
     <div class="li"><span class="sw" style="background:${CAT.inv.c}"></span>투자</div>
@@ -1446,6 +1587,7 @@ function confirmExtract(){
   const emerg = sumBy(a=>a.g==='유동성 · 비상금');
   const total = extSum();
   LS.set(assetKey(WZ.ym), { ym:WZ.ym, total, liq, inv, forced, emerg, accounts, seed:false, savedAt:new Date().toISOString() });
+  syncAcctReg(accounts);          // 새 계좌를 등록부에 자동 반영
   WZ.assetSaved = true;
   wzShow(5);
 }
