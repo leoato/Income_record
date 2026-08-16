@@ -1351,7 +1351,7 @@ function openDetail(ym){
     Object.keys(groups).filter(g=>!GROUPS.includes(g)).forEach(g=>{
       const list = groups[g]; const sub=list.reduce((s,a)=>s+a.v,0);
       h += `<div class="acc-group"><div class="acc-gh"><span>${esc(g)}</span><span>${fmt(sub)}원</span></div><div class="acc-tbl">`;
-      list.forEach(a=>{ h += `<div class="acc-r"><div class="an">${esc(a.n)}</div><div class="av">${fmt(a.v)}</div></div>`; });
+      list.forEach(a=>{ h += `<div class="acc-r"><div class="an">${esc(a.n)}${a.note?`<span class="note">${esc(a.note)}</span>`:''}</div><div class="av">${fmt(a.v)}</div></div>`; });
       h += `</div></div>`;
     });
   } else {
