@@ -306,6 +306,19 @@ table.simple tr:last-child td{border-bottom:none;}
 @keyframes tdot{0%,60%,100%{opacity:.25}30%{opacity:1}}
 .chat-err{font-size:11.5px;color:var(--up);padding:0 4px 12px;}
 .chat-err button{background:none;border:none;color:var(--blue);font-size:11.5px;font-weight:700;padding:0 0 0 6px;}
+.prop{background:var(--paper);border:1.5px solid var(--blue);border-radius:14px;padding:12px 14px;margin:-4px 0 12px;max-width:88%;}
+.prop .pk{font-size:10px;font-weight:800;letter-spacing:1px;color:var(--blue);margin-bottom:4px;}
+.prop .pl{font-size:13px;line-height:1.6;color:var(--ink);margin-bottom:10px;}
+.prop .pb{display:flex;gap:7px;}
+.prop .pb button{flex:1;border:none;border-radius:10px;padding:9px;font-size:12.5px;font-weight:700;}
+.prop .ok{background:var(--blue);color:#fff;}
+.prop .no{background:var(--sur2);color:var(--ink2);}
+.prop .pdone{font-size:12px;font-weight:700;color:var(--good);}
+.prop.done{border-color:var(--good);}
+.prop.done .pk{color:var(--good);}
+.prop.dismissed{border-color:var(--line2);opacity:.62;}
+.prop.dismissed .pk{color:var(--ink3);}
+.prop.dismissed .pdone{color:var(--ink3);}
 
 /* 정산 마법사 */
 #ov-wizard{z-index:57;}
@@ -1102,7 +1115,11 @@ function closeOv(id){ $(id).classList.remove('open'); }
 
 /* 집무실 */
 function chatRowHTML(m, i){
-  return `<div class="chat-row ${m.r==='u'?'u':'a'}"><div class="bub">${esc(m.t)}</div></div>`;
+  let h = `<div class="chat-row ${m.r==='u'?'u':'a'}"><div class="bub">${esc(m.t)}</div></div>`;
+  if(m.r==='a' && m.props && m.props.length){
+    h += m.props.map((p,j)=>propHTML(p,i,j)).join('');
+  }
+  return h;
 }
 function renderChat(){
   const b = $('chatBody');
@@ -1114,6 +1131,61 @@ function renderChat(){
   b.innerHTML = c.map((m,i)=>chatRowHTML(m,i)).join('');
   b.scrollTop = b.scrollHeight;
 }
+/* 제안 카드 — 장관은 제안만 하고, 재가해야 반영된다 */
+const PROP_LABEL = { note:'기록 제안', goal:'목표 변경 제안', action:'액션 이행 제안' };
+function propHTML(p, i, j){
+  const k = PROP_LABEL[p.kind] || '제안';
+  if(p.state==='applied'){
+    return `<div class="prop done"><div class="pk">${k}</div><div class="pl">${esc(p.label)}</div><div class="pdone">재가 완료</div></div>`;
+  }
+  if(p.state==='dismissed'){
+    return `<div class="prop dismissed"><div class="pk">${k}</div><div class="pl">${esc(p.label)}</div><div class="pdone">보류</div></div>`;
+  }
+  return `<div class="prop"><div class="pk">${k}</div><div class="pl">${esc(p.label)}</div>
+    <div class="pb"><button class="ok" onclick="applyProp(${i},${j})">재가</button><button class="no" onclick="dismissProp(${i},${j})">보류</button></div></div>`;
+}
+function dismissProp(i, j){
+  const c = getChat();
+  if(!c[i] || !c[i].props || !c[i].props[j]) return;
+  c[i].props[j].state = 'dismissed';
+  LS.set('mf_chat', c);
+  renderChat();
+}
+function applyProp(i, j){
+  const c = getChat();
+  if(!c[i] || !c[i].props || !c[i].props[j]) return;
+  const p = c[i].props[j];
+  if(p.state!=='pending') return;             // 중복 적용 차단
+  try{
+    if(p.kind==='note'){
+      if(!p.text) throw new Error('기록할 내용이 비어 있어요.');
+      addNote(p.text);
+    }else if(p.kind==='goal'){
+      const goals = LS.get('mf_goals') || [];
+      const g = goals.find(x=>normName(x.label)===normName(p.goalLabel||''));
+      if(!g) throw new Error(`'${p.goalLabel||'?'}' 목표를 찾을 수 없어요.`);
+      if(p.goalTarget!=null) g.target = p.goalTarget;
+      if(p.goalDue!=null) g.due = p.goalDue;
+      LS.set('mf_goals', goals);
+    }else if(p.kind==='action'){
+      const bym = allAssetYms().slice().reverse().find(m=>getBrief(m));
+      const b = bym ? getBrief(bym) : null;
+      if(!b || !b.actions || !b.actions[p.actionIdx]) throw new Error('해당 액션을 찾을 수 없어요.');
+      b.actions[p.actionIdx].done = true;
+      LS.set(briefKey(bym), b);
+    }else{
+      throw new Error('알 수 없는 제안이에요.');
+    }
+  }catch(e){
+    toast(e.message);
+    return;                                    // 실패하면 pending 유지
+  }
+  p.state = 'applied';
+  LS.set('mf_chat', c);
+  renderChat();
+  toast('재가 완료 — 반영했어요');
+}
+
 function openOffice(){
   openOv('ov-office');
   renderChat();
