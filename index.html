@@ -304,6 +304,8 @@ table.simple tr:last-child td{border-bottom:none;}
 .typing i:nth-child(2){animation-delay:.2s;}
 .typing i:nth-child(3){animation-delay:.4s;}
 @keyframes tdot{0%,60%,100%{opacity:.25}30%{opacity:1}}
+.bub .wait{color:var(--ink3);animation:waitpulse 1.7s ease-in-out infinite;}
+@keyframes waitpulse{0%,100%{opacity:.5}50%{opacity:1}}
 .chat-err{font-size:11.5px;color:var(--up);padding:0 4px 12px;}
 .chat-err button{background:none;border:none;color:var(--blue);font-size:11.5px;font-weight:700;padding:0 0 0 6px;}
 .prop{background:var(--paper);border:1.5px solid var(--blue);border-radius:14px;padding:12px 14px;margin:-4px 0 12px;max-width:88%;}
@@ -874,8 +876,19 @@ function geminiPick(names){
   for(const p of prefs){ const hit = names.find(n=>p.test(n)); if(hit) return hit; }
   return names[0] || null;
 }
-async function geminiJSON(system, parts, schema){
-  const model = LS.get('mf_gmodel') || 'gemini-2.5-flash';
+/* 집무실용 — 대화는 속도가 우선이라 flash 계열을 먼저 고른다 */
+function geminiPickFast(names){
+  const prefs = [
+    /^gemini-3.*flash(?!.*lite)/, /^gemini-3.*flash/,
+    /^gemini-2\.5-flash$/, /^gemini-2\.5-flash(?!.*lite)/, /flash/,
+  ];
+  for(const p of prefs){ const hit = names.find(n=>p.test(n)); if(hit) return hit; }
+  return geminiPick(names);
+}
+/* 집무실은 fast, 정산·총괄 브리핑은 mf_gmodel */
+function officeModel(){ return LS.get('mf_gmodel_fast') || 'gemini-2.5-flash'; }
+async function geminiJSON(system, parts, schema, modelOverride){
+  const model = modelOverride || LS.get('mf_gmodel') || 'gemini-2.5-flash';
   const gParts = parts.map(p=>p.image
     ? { inlineData:{ mimeType:p.image.mediaType, data:p.image.b64 } }
     : { text:p.text });
@@ -904,6 +917,91 @@ async function llmJSON(system, parts, schema){
   if(!LS.get('mf_key')) throw new ApiErr('no_key','API 키가 설정되지 않았어요.');
   return provider()==='gemini' ? geminiJSON(system, parts, schema) : anthropicJSON(system, parts, schema);
 }
+/* 스트리밍 중에는 완성된 JSON이 아니라 조각이 온다: {"reply":"대통령님, 현…
+   따옴표·이스케이프를 직접 훑어 reply 값만 부분 추출한다. 끝나지 않은 이스케이프는 잘라 버린다. */
+function partialReply(raw){
+  const k = raw.indexOf('"reply"');
+  if(k < 0) return null;
+  let i = raw.indexOf('"', k + 7);
+  if(i < 0) return null;
+  i++;
+  let s = '';
+  while(i < raw.length){
+    const ch = raw[i];
+    if(ch === '\\'){
+      const n = raw[i+1];
+      if(n === undefined) break;                 // 이스케이프가 잘림 — 여기까지만
+      if(n === 'u'){
+        const hex = raw.slice(i+2, i+6);
+        if(hex.length < 4) break;
+        s += String.fromCharCode(parseInt(hex, 16));
+        i += 6; continue;
+      }
+      const map = { n:'\n', t:'\t', r:'\r', b:'\b', f:'\f', '"':'"', '\\':'\\', '/':'/' };
+      s += (map[n] !== undefined ? map[n] : n);
+      i += 2; continue;
+    }
+    if(ch === '"') break;                        // 값 끝
+    s += ch; i++;
+  }
+  return s;
+}
+/* SSE 스트리밍 — 도착하는 대로 onText(부분 reply)를 부른다. 끝나면 완성 JSON을 반환. */
+async function geminiStream(system, parts, schema, model, onText){
+  const gParts = parts.map(p=>p.image
+    ? { inlineData:{ mimeType:p.image.mediaType, data:p.image.b64 } }
+    : { text:p.text });
+  let res;
+  try{
+    res = await fetch(`${GEMINI_BASE}/models/${model}:streamGenerateContent?alt=sse`,{ method:'POST', headers:{
+      'content-type':'application/json',
+      ...gauthHeaders(LS.get('mf_key')||'', LS.get('mf_gauth')||'apikey'),
+    }, body: JSON.stringify({
+      systemInstruction:{ parts:[{ text:system }] },
+      contents:[{ role:'user', parts:gParts }],
+      generationConfig:{ responseMimeType:'application/json', responseSchema:toGeminiSchema(schema) },
+    })});
+  }catch{ throw new ApiErr('net','네트워크 오류 — 인터넷 연결을 확인해주세요.'); }
+  if(!res.ok){ let msg=''; try{ const e=await res.json(); msg=e?.error?.message; }catch{} throw mapStatus(res,msg); }
+
+  let buf='', raw='', shown='', blocked=null, finish=null;
+  const feed = chunk=>{
+    buf += chunk;
+    let nl;
+    while((nl = buf.indexOf('\n')) >= 0){
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl+1);
+      if(!line.startsWith('data:')) continue;
+      const payload = line.slice(5).trim();
+      if(!payload || payload === '[DONE]') continue;
+      let j; try{ j = JSON.parse(payload); }catch{ continue; }
+      if(j.promptFeedback?.blockReason) blocked = j.promptFeedback.blockReason;
+      const c = j.candidates?.[0];
+      if(c?.finishReason) finish = c.finishReason;
+      const t = (c?.content?.parts||[]).map(p=>p.text||'').join('');
+      if(!t) continue;
+      raw += t;
+      const pr = partialReply(raw);
+      if(pr !== null && pr !== shown){ shown = pr; onText(pr); }
+    }
+  };
+  if(res.body){
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    for(;;){
+      const { done, value } = await reader.read();
+      if(done) break;
+      feed(dec.decode(value, { stream:true }));
+    }
+  }else{
+    feed(await res.text());                      // 스트리밍 미지원 환경 — 통째로 읽어 같은 파서에 넣는다
+  }
+  if(blocked) throw new ApiErr('refusal','요청이 안전상 이유로 거절되었어요. 다시 시도해주세요.');
+  if(finish === 'MAX_TOKENS') throw new ApiErr('trunc','응답이 잘렸어요. 다시 시도해주세요.');
+  if(!raw.trim()) throw new ApiErr('bad','응답이 비어 있어요. 다시 시도해주세요.');
+  return parseJSONOut(raw);
+}
+
 async function validateKey(key){
   const kp = keyProvider(key);
   if(kp==='gemini' || kp===null){
@@ -911,7 +1009,8 @@ async function validateKey(key){
       const names = await geminiListModels(key);
       const pick = geminiPick(names);
       if(!pick) throw new ApiErr('bad','이 키로 사용할 수 있는 Gemini 모델을 찾지 못했어요.');
-      LS.set('mf_gmodel', pick); LS.set('mf_provider','gemini');
+      LS.set('mf_gmodel', pick); LS.set('mf_gmodel_fast', geminiPickFast(names) || pick);
+      LS.set('mf_provider','gemini');
       return pick;
     }catch(e){
       if(kp==='gemini' || e.kind==='net') throw e;   // 확실한 제미나이 키거나 네트워크 문제면 그대로 보고
@@ -1012,8 +1111,15 @@ function officeSystem(){
 - note = 다음 정산에 넘길 확정 사실, goal = 목표 금액·기한 변경, action = 최근 브리핑 액션의 이행 체크.
 - 한 답변에 제안은 최대 2개.`;
 }
-async function callOffice(){
-  return llmJSON(officeSystem(), [{ text: JSON.stringify(officePayload(), null, 1) }], CHAT_SCHEMA);
+/* onText를 주면 스트리밍(제미나이 한정). 안 주면 기존처럼 한 번에 받는다. */
+async function callOffice(onText){
+  if(!LS.get('mf_key')) throw new ApiErr('no_key','API 키가 설정되지 않았어요.');
+  const system = officeSystem();
+  const parts = [{ text: JSON.stringify(officePayload(), null, 1) }];
+  if(provider() !== 'gemini') return anthropicJSON(system, parts, CHAT_SCHEMA);
+  const model = officeModel();
+  if(typeof onText === 'function') return geminiStream(system, parts, CHAT_SCHEMA, model, onText);
+  return geminiJSON(system, parts, CHAT_SCHEMA, model);
 }
 
 async function callExtract(images, ym){
@@ -1210,6 +1316,32 @@ function autoGrow(el){
   el.style.height = 'auto';
   el.style.height = Math.min(110, el.scrollHeight) + 'px';
 }
+
+/* 첫 글자가 오기 전까지의 침묵을 채운다 (모델이 내부 추론하는 구간).
+   결과를 암시하는 문구는 넣지 않는다 — 실제 재정 상황과 무관해야 한다. */
+const WAIT_MSGS = [
+  '장관이 자료를 검토하는 중…',
+  '차관이 허겁지겁 출근해 장부를 펴는 중…',
+  '회계과에서 계산기를 두드리는 중…',
+  '지난달 원장을 다시 들춰보는 중…',
+  '감사관이 숫자를 재검산하는 중…',
+  '통계청에 자료를 요청하는 중…',
+  '브리핑 문안을 다듬는 중…',
+  '결재 도장을 어디 뒀는지 찾는 중…',
+  '장관이 안경을 고쳐 쓰는 중…',
+  '실무진이 커피를 리필하는 중…',
+  '보고서 초안에 빨간 줄이 그어지는 중…',
+  '집무실 불이 아직 꺼지지 않았습니다…',
+];
+let WAIT_TIMER = null;
+function startWaitMsgs(el){
+  stopWaitMsgs();
+  let i = Math.floor(Math.random() * WAIT_MSGS.length);
+  const tick = ()=>{ el.textContent = WAIT_MSGS[i % WAIT_MSGS.length]; i++; };
+  tick();
+  WAIT_TIMER = setInterval(tick, 2500);
+}
+function stopWaitMsgs(){ if(WAIT_TIMER){ clearInterval(WAIT_TIMER); WAIT_TIMER = null; } }
 async function sendOffice(isRetry){
   if(OFFICE_BUSY) return;
   const inp = $('chatIn');
@@ -1227,23 +1359,32 @@ async function sendOffice(isRetry){
   renderChat();
   const b = $('chatBody');
   b.insertAdjacentHTML('beforeend',
-    `<div class="chat-row a" id="chatTyping"><div class="bub" style="padding:0"><div class="typing"><i></i><i></i><i></i></div></div></div>`);
+    `<div class="chat-row a" id="chatLive"><div class="bub"><span id="chatLiveTx"></span><span class="wait" id="chatWait"></span></div></div>`);
+  const waitEl = $('chatWait'), txEl = $('chatLiveTx');
+  startWaitMsgs(waitEl);
   b.scrollTop = b.scrollHeight;
+  /* 첫 글자가 오는 순간 대기 문구를 치우고 실제 답변으로 바꾼다 */
+  const onText = s=>{
+    if(waitEl.style.display !== 'none'){ stopWaitMsgs(); waitEl.style.display = 'none'; }
+    txEl.textContent = s;
+    b.scrollTop = b.scrollHeight;
+  };
   try{
-    const r = await callOffice();
+    const r = await callOffice(onText);
     pushChat({
       r:'a', t:r.reply, ts:new Date().toISOString(),
       props:(r.proposals||[]).map(p=>({ ...p, state:'pending' })),
     });
-    renderChat();
+    renderChat();                                 // 제안 카드는 JSON이 끝나야 붙는다
   }catch(e){
-    const tp = document.getElementById('chatTyping');
-    if(tp) tp.remove();
+    const live = document.getElementById('chatLive');
+    if(live) live.remove();
     const msg = (e && e.message) ? e.message : '전송에 실패했어요.';
     b.insertAdjacentHTML('beforeend',
       `<div class="chat-err">${esc(msg)}<button onclick="retryOffice()">다시 보내기</button></div>`);
     b.scrollTop = b.scrollHeight;
   }finally{
+    stopWaitMsgs();
     OFFICE_BUSY = false;
     $('chatSend').disabled = false;
   }
@@ -2100,7 +2241,10 @@ function renderKeyArea(){
   const a = $('keyArea');
   const key = LS.get('mf_key');
   if(key){
-    const prov = provider()==='gemini' ? `Gemini · ${LS.get('mf_gmodel')||''}` : `Claude · ${A_MODEL}`;
+    const sm = m=>String(m||'').replace(/^gemini-/,'').replace(/-preview.*$/,'') || '?';
+    const prov = provider()==='gemini'
+      ? `Gemini · 집무실 ${sm(officeModel())} · 브리핑 ${sm(LS.get('mf_gmodel'))}`
+      : `Claude · ${A_MODEL}`;
     a.innerHTML = `<div class="key-ok">
       <div><div class="kt">✓ 키 등록됨</div><div class="ks">····${esc(key.slice(-4))} · ${esc(prov)}</div></div>
       <button class="btn sm ghost" onclick="removeKey()">삭제</button>
@@ -2127,7 +2271,7 @@ async function verifyKey(){
     $('keyBtn').textContent='검증'; $('keyBtn').disabled=false;
   }
 }
-function removeKey(){ LS.del('mf_key'); LS.del('mf_provider'); LS.del('mf_gmodel'); renderKeyArea(); renderMin(); toast('키 삭제됨 — 장관 기능 잠김'); }
+function removeKey(){ LS.del('mf_key'); LS.del('mf_provider'); LS.del('mf_gmodel'); LS.del('mf_gmodel_fast'); renderKeyArea(); renderMin(); toast('키 삭제됨 — 장관 기능 잠김'); }
 
 function renderSrcList(){
   const sources = getSources();
