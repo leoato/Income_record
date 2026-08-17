@@ -652,6 +652,24 @@ function getAsset(ym){ return LS.get(assetKey(ym)); }
 function getBrief(id){ return LS.get(briefKey(id)); }
 function saveBrief(b){ LS.set(briefKey(b.id), b); }
 
+/* 집무실 — 대화·확정기록 */
+const CHAT_WINDOW = 12;      // API로 보낼 최근 메시지 수 (사용자+장관 합산)
+const NOTES_SEND_MAX = 40;   // API로 보낼 확정 기록 최대 개수
+
+function getChat(){ return LS.get('mf_chat', []); }
+function pushChat(msg){ const c = getChat(); c.push(msg); LS.set('mf_chat', c); return c; }
+function clearChat(){ LS.del('mf_chat'); }
+function getNotes(){ return LS.get('mf_notes', []); }
+function addNote(text){
+  const n = getNotes();
+  n.push({ ts:new Date().toISOString(), text:String(text), src:'chat' });
+  LS.set('mf_notes', n);
+  return n;
+}
+function delNote(i){ const n = getNotes(); n.splice(i,1); LS.set('mf_notes', n); }
+/* 전송 상한 — 이게 없으면 '전송량 상수' 약속이 거짓이 된다 */
+function notesForSend(){ return getNotes().slice(-NOTES_SEND_MAX).map(n=>n.text); }
+
 /*
    유틸
 */
