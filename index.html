@@ -11,11 +11,11 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700;900&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
-/* ══════════════════════════════════════════════════════
+/*
    재무부 장관 — 월급 기록 + 자산 정산 + 국정 브리핑
    스타일: 토스풍 베이스 + 브리핑 상세만 관보(官報)
    스펙: UX프로토타입.html (uxdraft 확정)
-══════════════════════════════════════════════════════ */
+*/
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 :root{
   --ink:#191F28; --ink2:#4E5968; --ink3:#8B95A1; --ink4:#B0B8C1;
@@ -78,7 +78,7 @@ input,textarea,select{font-family:inherit;}
 .badge.line{background:var(--blue-bg);color:var(--blue);}
 .badge.ok{background:var(--good-bg);color:var(--good);}
 
-/* ══ 캘린더 ══ */
+/* 캘린더 */
 .mnav{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
 .mnav-btn{width:38px;height:38px;background:none;border:none;font-size:19px;color:var(--ink4);border-radius:50%;}
 .mnav-btn:active{background:var(--sur2);}
@@ -102,7 +102,7 @@ input,textarea,select{font-family:inherit;}
 .dc .bar{height:3.5px;border-radius:2px;margin:3px 0 2px;}
 .dc .amt{font-size:10px;font-weight:700;color:var(--ink);}
 
-/* ══ 시트 공통 ══ */
+/* 시트 공통 */
 .backdrop{position:fixed;inset:0;background:rgba(25,31,40,.5);z-index:50;opacity:0;pointer-events:none;transition:opacity .25s;}
 .backdrop.open{opacity:1;pointer-events:all;}
 .sheet{position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(105%);width:100%;max-width:430px;background:var(--paper);border-radius:24px 24px 0 0;z-index:51;padding:0 20px calc(env(safe-area-inset-bottom,0) + 24px);transition:transform .3s cubic-bezier(.32,1,.38,1);max-height:88vh;overflow-y:auto;}
@@ -122,7 +122,7 @@ input,textarea,select{font-family:inherit;}
 .btnrow{display:flex;gap:9px;margin-top:8px;}
 .del-btn{width:52px;border-radius:13px;border:none;background:var(--up-bg);color:var(--up);display:flex;align-items:center;justify-content:center;}
 
-/* ══ 분석 ══ */
+/* 분석 */
 .pills{display:flex;gap:5px;background:var(--sur2);border-radius:13px;padding:4px;margin-bottom:16px;}
 .pill{flex:1;padding:8px 4px;border-radius:10px;border:none;background:transparent;font-size:12px;font-weight:700;color:var(--ink3);}
 .pill.on{background:var(--paper);color:var(--ink);box-shadow:var(--shadow);}
@@ -147,7 +147,7 @@ table.simple td{padding:10px 6px;font-size:13px;border-bottom:1px solid var(--li
 table.simple td:first-child{text-align:left;font-weight:700;color:var(--ink);}
 table.simple tr:last-child td{border-bottom:none;}
 
-/* ══ 자산 ══ */
+/* 자산 */
 .networth{font-size:29px;font-weight:800;letter-spacing:-.7px;line-height:1.15;font-variant-numeric:tabular-nums;}
 .delta{display:inline-block;font-size:12px;font-weight:700;margin-top:7px;border-radius:8px;padding:3.5px 9px;}
 .delta.up{color:var(--up);background:var(--up-bg);}
@@ -175,7 +175,7 @@ table.simple tr:last-child td{border-bottom:none;}
 .mrow .md{font-size:11px;text-align:right;font-weight:700;margin-top:1px;}
 .mrow .chev{color:var(--ink4);font-size:17px;margin-left:9px;}
 
-/* ══ 오버레이 서브페이지 ══ */
+/* 오버레이 서브페이지 */
 .ovpage{position:fixed;inset:0;background:var(--sur);z-index:55;max-width:430px;margin:0 auto;transform:translateY(14px);opacity:0;visibility:hidden;transition:transform .22s ease,opacity .22s ease,visibility 0s .22s;overflow-y:auto;padding:0 18px 40px;}
 .ovpage.open{transform:none;opacity:1;visibility:visible;transition:transform .22s ease,opacity .22s ease;}
 .ov-hdr{display:flex;align-items:center;gap:11px;padding:calc(env(safe-area-inset-top,0px) + 14px) 0 14px;position:sticky;top:0;background:var(--sur);z-index:5;}
@@ -193,7 +193,7 @@ table.simple tr:last-child td{border-bottom:none;}
 .acc-r .an .note{display:block;font-size:10px;color:var(--ink3);}
 .acc-r .av{font-size:13.5px;font-weight:700;font-variant-numeric:tabular-nums;}
 
-/* ══ 장관 ══ */
+/* 장관 */
 .lock-card{text-align:center;padding:36px 22px;}
 .lock-ic{margin-bottom:12px;display:flex;justify-content:center;}
 .lock-t{font-size:17px;font-weight:800;margin-bottom:8px;letter-spacing:-.3px;}
@@ -228,7 +228,7 @@ table.simple tr:last-child td{border-bottom:none;}
 .arch-t span:last-child{color:var(--ink4);}
 .arch-p{font-size:12px;color:var(--ink3);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 
-/* ══ 브리핑 상세 — 관보(官報) ══ */
+/* 브리핑 상세 — 관보(官報) */
 #ov-brief{background:var(--gb-paper);color:var(--gb-ink);font-family:'Noto Serif KR',serif;}
 #ov-brief .ov-hdr{background:var(--gb-paper);border-bottom:3px double var(--gb-ink);padding-bottom:12px;}
 #ov-brief .back-btn{background:transparent;border:1.5px solid var(--gb-ink);border-radius:8px;color:var(--gb-ink);}
@@ -283,7 +283,7 @@ table.simple tr:last-child td{border-bottom:none;}
 .fulltext{background:var(--paper);border-radius:14px;padding:16px;font-size:12.5px;color:var(--ink2);line-height:1.8;white-space:pre-line;display:none;box-shadow:var(--shadow);}
 .fulltext.open{display:block;}
 
-/* ══ 정산 마법사 ══ */
+/* 정산 마법사 */
 #ov-wizard{z-index:57;}
 .wz-prog{display:flex;gap:5px;margin-bottom:20px;}
 .wz-prog .seg{flex:1;height:4px;border-radius:2px;background:var(--line2);}
@@ -328,7 +328,7 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
 .done-hero .d{font-size:13px;color:var(--ink2);line-height:1.65;margin-bottom:22px;}
 #fileInput{display:none;}
 
-/* ══ 설정 ══ */
+/* 설정 */
 .set-sec{margin-bottom:24px;}
 .keyrow{display:flex;gap:8px;}
 .keyrow .inp{margin-bottom:0;flex:1;}
@@ -351,7 +351,7 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
 </head>
 <body>
 
-<!-- ══════════ 탭1 캘린더 ══════════ -->
+<!-- 탭1 캘린더 -->
 <div class="page on" id="pg-cal">
   <div class="hdr">
     <div><h1>수입 캘린더</h1><div class="sub">Income Log</div></div>
@@ -375,7 +375,7 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
   </div>
 </div>
 
-<!-- ══════════ 탭2 분석 ══════════ -->
+<!-- 탭2 분석 -->
 <div class="page" id="pg-an">
   <div class="hdr"><div><h1>수입 분석</h1><div class="sub">기간별 통계</div></div></div>
   <div class="pills" id="anPills">
@@ -387,13 +387,13 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
   <div id="anBody"></div>
 </div>
 
-<!-- ══════════ 탭3 자산 ══════════ -->
+<!-- 탭3 자산 -->
 <div class="page" id="pg-asset">
   <div class="hdr"><div><h1>자산</h1><div class="sub">월말 스냅샷 · 순자산 추이</div></div></div>
   <div id="assetBody"></div>
 </div>
 
-<!-- ══════════ 탭4 계좌 ══════════ -->
+<!-- 탭4 계좌 -->
 <div class="page" id="pg-acct">
   <div class="hdr">
     <div><h1>계좌</h1><div class="sub" id="acctSub">카테고리별 정리</div></div>
@@ -402,7 +402,7 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
   <div id="acctBody"></div>
 </div>
 
-<!-- ══════════ 탭5 장관 ══════════ -->
+<!-- 탭5 장관 -->
 <div class="page" id="pg-min">
   <div class="hdr"><div><h1>재무부 장관</h1><div class="sub">월말 정산 · 국정 브리핑</div></div></div>
   <div id="minBody"></div>
@@ -417,7 +417,7 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
   <button class="tab" id="tab-min" onclick="go('min')"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M6 21v-1a6 6 0 0 1 12 0v1"/></svg>장관</button>
 </nav>
 
-<!-- ══════════ 오버레이: 자산 월 상세 ══════════ -->
+<!-- 오버레이: 자산 월 상세 -->
 <div class="ovpage" id="ov-detail">
   <div class="ov-hdr">
     <button class="back-btn" onclick="closeOv('ov-detail')">‹</button>
@@ -426,7 +426,7 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
   <div id="dtBody"></div>
 </div>
 
-<!-- ══════════ 오버레이: 계좌별 추이 ══════════ -->
+<!-- 오버레이: 계좌별 추이 -->
 <div class="ovpage" id="ov-acctd">
   <div class="ov-hdr">
     <button class="back-btn" onclick="closeOv('ov-acctd')">‹</button>
@@ -435,7 +435,7 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
   <div id="adBody"></div>
 </div>
 
-<!-- ══════════ 오버레이: 브리핑 상세 (官報) ══════════ -->
+<!-- 오버레이: 브리핑 상세 (官報) -->
 <div class="ovpage" id="ov-brief">
   <div class="ov-hdr">
     <button class="back-btn" onclick="closeOv('ov-brief')">‹</button>
@@ -448,7 +448,7 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
   <div id="bfBody"></div>
 </div>
 
-<!-- ══════════ 오버레이: 정산 마법사 ══════════ -->
+<!-- 오버레이: 정산 마법사 -->
 <div class="ovpage" id="ov-wizard">
   <div class="ov-hdr">
     <button class="back-btn" onclick="exitWizard()">✕</button>
@@ -542,7 +542,7 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
   </div>
 </div>
 
-<!-- ══════════ 시트: 수입 입력 ══════════ -->
+<!-- 시트: 수입 입력 -->
 <div class="backdrop" id="bd" onclick="closeAllSheets()"></div>
 <div class="sheet" id="sh-income">
   <div class="sh-handle"></div>
@@ -557,7 +557,7 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
   </div>
 </div>
 
-<!-- ══════════ 시트: 설정 ══════════ -->
+<!-- 시트: 설정 -->
 <div class="sheet" id="sh-set">
   <div class="sh-handle"></div>
   <div class="sh-title">설정</div>
@@ -588,7 +588,7 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
   </div>
 </div>
 
-<!-- ══════════ 시트: 계좌 추가 ══════════ -->
+<!-- 시트: 계좌 추가 -->
 <div class="sheet" id="sh-acct">
   <div class="sh-handle"></div>
   <div class="sh-title">계좌 추가</div>
@@ -604,12 +604,12 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
 <script>
 'use strict';
 
-/* ════════════════════════════════════════════
+/*
    상수 · 설정
    ※ 개인 데이터(과거 원장·계좌 구조·국정 컨텍스트·수입원)는
      코드에 넣지 않는다 — 시드 파일을 '백업 복원'으로 불러와
      이 기기의 localStorage에만 저장된다.
-════════════════════════════════════════════ */
+*/
 const A_MODEL = 'claude-opus-5';
 const GOAL = 100000000;            // 순자산 1억
 const emergGoal = ()=>LS.get('mf_emerg_goal', 5000000);   // 비상금 목표 (시드로 조정 가능)
@@ -624,9 +624,9 @@ const doctrine = ()=>LS.get('mf_doctrine') || GENERIC_DOCTRINE;
 const roadmapCfg = ()=>LS.get('mf_roadmap');   // {phases:[{t,d,from,to}], milestones:[{label,date}]} — 시드에서
 const extractHint = ()=>LS.get('mf_extract_hint') || '';
 
-/* ════════════════════════════════════════════
+/*
    저장소
-════════════════════════════════════════════ */
+*/
 const LS = {
   get(k, fallback=null){ try{ const v = localStorage.getItem(k); return v===null ? fallback : JSON.parse(v); }catch{ return fallback; } },
   set(k, v){ localStorage.setItem(k, JSON.stringify(v)); },
@@ -652,9 +652,9 @@ function getAsset(ym){ return LS.get(assetKey(ym)); }
 function getBrief(id){ return LS.get(briefKey(id)); }
 function saveBrief(b){ LS.set(briefKey(b.id), b); }
 
-/* ════════════════════════════════════════════
+/*
    유틸
-════════════════════════════════════════════ */
+*/
 const $ = id=>document.getElementById(id);
 const fmt = n=>(Number(n)||0).toLocaleString();
 const fmtWon = n=>fmt(n)+'원';
@@ -678,9 +678,9 @@ function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 let _tt;
 function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(_tt); _tt=setTimeout(()=>t.classList.remove('show'), msg.length>40?6000:2800); }
 
-/* ════════════════════════════════════════════
+/*
    Claude API
-════════════════════════════════════════════ */
+*/
 class ApiErr extends Error{ constructor(kind,msg){ super(msg); this.kind=kind; } }
 /* 키 접두사로 제공자 자동 감지: AIza…/AQ.… = Google Gemini, sk-ant… = Anthropic Claude
    모르는 형식이면 null → 검증 때 양쪽 다 시도해 되는 쪽으로 확정 (mf_provider에 저장) */
@@ -937,9 +937,9 @@ async function callBatchBrief(){
   return llmJSON(system, [{ text: JSON.stringify({ 월별_원장:rows, 최근월_계좌상세:last?.accounts||null, 최근월_비상금:last?.emerg||null }, null, 1) }], BRIEF_SCHEMA);
 }
 
-/* ════════════════════════════════════════════
+/*
    탭 · 공통 UI
-════════════════════════════════════════════ */
+*/
 const UI = { tab:'cal', calY:0, calM:0, anRange:0, incDate:null, incSrc:null };
 function go(tab){
   UI.tab = tab;
@@ -965,9 +965,9 @@ function setAmtMode(m){
   renderCal();
 }
 
-/* ════════════════════════════════════════════
+/*
    캘린더
-════════════════════════════════════════════ */
+*/
 function chMonth(d){ let m=UI.calM+d, y=UI.calY; if(m<0){m=11;y--;} if(m>11){m=0;y++;} UI.calY=y; UI.calM=m; renderCal(); }
 function renderCal(){
   const y=UI.calY, m=UI.calM;
@@ -1027,9 +1027,9 @@ function deleteIncome(){
   closeAllSheets(); renderCal(); toast('삭제됐어요');
 }
 
-/* ════════════════════════════════════════════
+/*
    분석
-════════════════════════════════════════════ */
+*/
 function setAnRange(r,btn){ UI.anRange=r; document.querySelectorAll('#anPills .pill').forEach(p=>p.classList.remove('on')); btn.classList.add('on'); renderAn(); }
 function renderAn(){
   const byM={};
@@ -1073,9 +1073,9 @@ function renderAn(){
   $('anBody').innerHTML = h;
 }
 
-/* ════════════════════════════════════════════
+/*
    계좌 등록부 — 표시용 + AI 판독 힌트
-════════════════════════════════════════════ */
+*/
 const normName = n=>String(n||'').replace(/\s/g,'');
 function getAcctReg(){
   let reg = LS.get('mf_accounts');
@@ -1179,9 +1179,9 @@ function deleteAcctReg(i){
   renderAcct(); toast('계좌 목록에서 제거됨');
 }
 
-/* ════════════════════════════════════════════
+/*
    자산
-════════════════════════════════════════════ */
+*/
 const CAT = { liq:{c:'var(--c-liq)',l:'유동성'}, inv:{c:'var(--c-inv)',l:'투자'}, forced:{c:'var(--c-forced)',l:'강제저축'} };
 function setChartMode(m){ LS.set('mf_chartmode', m); renderAsset(); }
 
@@ -1432,9 +1432,9 @@ async function regenBrief(ym){
   }
 }
 
-/* ════════════════════════════════════════════
+/*
    장관 홈
-════════════════════════════════════════════ */
+*/
 function targetYm(){
   const d = new Date();
   return d.getDate() <= 5 ? ymShift(ymNow(),-1) : ymNow();   // 월초 5일까지는 전월 결산이 기본
@@ -1445,7 +1445,7 @@ function renderMin(){
     b.innerHTML = `<div class="card lock-card">
       <div class="lock-ic"><svg viewBox="0 0 24 24" style="width:38px;height:38px;stroke:var(--blue);fill:none;stroke-width:1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
       <div class="lock-t">장관 임명이 필요합니다</div>
-      <div class="lock-d">Claude API 키를 등록하면 앱 안에서 바로<br>토스 캡처 판독 → 월말 정산 → 장관 브리핑을<br>받을 수 있어요.</div>
+      <div class="lock-d">API 키(Gemini·Claude)를 등록하면 앱 안에서 바로<br>토스 캡처 판독 → 월말 정산 → 장관 브리핑을<br>받을 수 있어요.</div>
       <button class="btn" onclick="openSettings()">API 키 설정하기</button>
     </div>
     <div class="sec-title">장관이 하는 일</div>
@@ -1546,9 +1546,9 @@ async function genBatchBrief(){
   }
 }
 
-/* ════════════════════════════════════════════
+/*
    브리핑 상세 (관보)
-════════════════════════════════════════════ */
+*/
 function makeBrief(ym, r){
   return {
     id:ym, ym,
@@ -1587,9 +1587,9 @@ function toggleAct(id,i,el){
   el.classList.toggle('done');
 }
 
-/* ════════════════════════════════════════════
+/*
    정산 마법사
-════════════════════════════════════════════ */
+*/
 const WZ = { step:1, ym:null, images:[], ext:null, assetSaved:false };
 function startWizard(){
   WZ.step=1; WZ.ym=targetYm(); WZ.images=[]; WZ.ext=null; WZ.assetSaved=false;
@@ -1706,7 +1706,7 @@ function checkSum(){
   if(sum===target){
     box.className='verify ok';
     const prev = getAsset(ymShift(WZ.ym,-1));
-    const sameAsPrev = prev && prev.total===target ? ' · ⚠ 전월 총자산과 동일해요 — 같은 달 캡처가 아닌지 확인' : '';
+    const sameAsPrev = prev && prev.total===target ? ' · 전월 총자산과 동일해요 — 같은 달 캡처가 아닌지 확인' : '';
     box.textContent=`합계 일치 — 추출 ${fmt(sum)}원 = 캡처 총자산 ${fmt(target)}원${sameAsPrev}`;
     next.disabled=false;
   }else{
@@ -1759,9 +1759,9 @@ function finishWizard(){
   toast(`${ymLabel(WZ.ym)} 스냅샷 저장 · 브리핑 도착`);
 }
 
-/* ════════════════════════════════════════════
+/*
    설정
-════════════════════════════════════════════ */
+*/
 function openSettings(){ renderKeyArea(); renderSrcList(); openSheet('sh-set'); }
 function renderKeyArea(){
   const a = $('keyArea');
@@ -1918,9 +1918,9 @@ function confirmClear(){
   location.reload();
 }
 
-/* ════════════════════════════════════════════
+/*
    초기화
-════════════════════════════════════════════ */
+*/
 $('pill-'+(amtMode==='round'?'round':'exact')).classList.add('on');
 {
   const now = new Date();
