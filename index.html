@@ -1124,6 +1124,52 @@ function openOffice(){
   setTimeout(()=>$('chatIn') && $('chatIn').focus(), 250);
 }
 
+let OFFICE_BUSY = false;
+function autoGrow(el){
+  el.style.height = 'auto';
+  el.style.height = Math.min(110, el.scrollHeight) + 'px';
+}
+async function sendOffice(isRetry){
+  if(OFFICE_BUSY) return;
+  const inp = $('chatIn');
+  if(isRetry===true){
+    const c = getChat();
+    if(!c.length || c[c.length-1].r!=='u') return;   // 재전송할 질문이 없음
+  }else{
+    const text = inp.value.trim();
+    if(!text) return;
+    inp.value = ''; autoGrow(inp);
+    pushChat({ r:'u', t:text, ts:new Date().toISOString() });
+  }
+  OFFICE_BUSY = true;
+  $('chatSend').disabled = true;
+  renderChat();
+  const b = $('chatBody');
+  b.insertAdjacentHTML('beforeend',
+    `<div class="chat-row a" id="chatTyping"><div class="bub" style="padding:0"><div class="typing"><i></i><i></i><i></i></div></div></div>`);
+  b.scrollTop = b.scrollHeight;
+  try{
+    const r = await callOffice();
+    pushChat({
+      r:'a', t:r.reply, ts:new Date().toISOString(),
+      props:(r.proposals||[]).map(p=>({ ...p, state:'pending' })),
+    });
+    renderChat();
+  }catch(e){
+    const tp = document.getElementById('chatTyping');
+    if(tp) tp.remove();
+    const msg = (e && e.message) ? e.message : '전송에 실패했어요.';
+    b.insertAdjacentHTML('beforeend',
+      `<div class="chat-err">${esc(msg)}<button onclick="retryOffice()">다시 보내기</button></div>`);
+    b.scrollTop = b.scrollHeight;
+  }finally{
+    OFFICE_BUSY = false;
+    $('chatSend').disabled = false;
+  }
+}
+/* 재전송은 사용자 메시지를 다시 쌓지 않는다 — 마지막 질문은 이미 mf_chat에 있고 페이로드가 포함한다 */
+function retryOffice(){ sendOffice(true); }
+
 function setAmtMode(m){
   amtMode = m; localStorage.setItem('amtMode', m);
   $('pill-round').classList.toggle('on', m==='round');
