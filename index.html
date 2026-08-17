@@ -777,10 +777,14 @@ function keyProvider(key){
   return null;
 }
 function provider(){ return LS.get('mf_provider') || keyProvider(LS.get('mf_key')) || 'gemini'; }
+/* 모델이 단종·개명되면 여기로 걸러 자동 갱신 대상으로 삼는다 (예: 2.5-flash 단종) */
+const MODEL_ERR_RE = /no longer available|not found|is not supported|unsupported|not available|deprecated|update your code/i;
+function isModelErr(e){ return !!e && e.kind === 'model'; }
 function mapStatus(res, msg){
   if(res.status===401 || res.status===403) return new ApiErr('auth','API 키가 유효하지 않아요. 설정에서 키를 확인해주세요.');
   if(res.status===429) return new ApiErr('rate','요청 한도를 초과했어요. 잠시 후 다시 시도해주세요.');
   if(res.status===529 || res.status>=500) return new ApiErr('server','서버가 붐벼요. 잠시 후 다시 시도해주세요.');
+  if(res.status===404 || MODEL_ERR_RE.test(msg||'')) return new ApiErr('model', msg || `모델을 쓸 수 없어요 (${res.status})`);
   return new ApiErr('bad', msg || `API 오류 (${res.status})`);
 }
 function parseJSONOut(text){
@@ -890,9 +894,39 @@ function geminiPickFast(names){
   return geminiPick(names);
 }
 /* 집무실은 fast, 정산·총괄 브리핑은 mf_gmodel */
-function officeModel(){ return LS.get('mf_gmodel_fast') || 'gemini-2.5-flash'; }
+function officeModel(){ return LS.get('mf_gmodel_fast') || LS.get('mf_gmodel') || ''; }
+function briefModel(){ return LS.get('mf_gmodel') || LS.get('mf_gmodel_fast') || ''; }
+/* 목록을 다시 받아 두 모델을 최신으로 재선정 — 단종되면 여기로 복구된다 */
+async function refreshModels(){
+  const names = await geminiListModels(LS.get('mf_key')||'');
+  const main = geminiPick(names);
+  if(!main) throw new ApiErr('bad','이 키로 쓸 수 있는 Gemini 모델을 찾지 못했어요.');
+  LS.set('mf_gmodel', main);
+  LS.set('mf_gmodel_fast', geminiPickFast(names) || main);
+  return main;
+}
+async function ensureModels(){
+  if(LS.get('mf_gmodel') && LS.get('mf_gmodel_fast')) return;
+  await refreshModels();
+}
+/* 모델 오류면 목록을 갱신해 한 번만 재시도한다 */
+async function withModelFallback(run, pick){
+  await ensureModels();
+  try{ return await run(pick()); }
+  catch(e){
+    if(!isModelErr(e)) throw e;
+    const before = pick();
+    await refreshModels();
+    const after = pick();
+    if(after && after !== before) toast(`모델이 단종돼 ${after}로 갱신했어요`);
+    if(!after || after === before) throw e;      // 갱신해도 그대로면 원래 오류를 보고
+    renderKeyArea();
+    return run(after);
+  }
+}
 async function geminiJSON(system, parts, schema, modelOverride){
-  const model = modelOverride || LS.get('mf_gmodel') || 'gemini-2.5-flash';
+  const model = modelOverride || LS.get('mf_gmodel') || LS.get('mf_gmodel_fast');
+  if(!model) throw new ApiErr('model','사용할 모델이 정해지지 않았어요. 설정에서 키를 다시 등록해주세요.');
   const gParts = parts.map(p=>p.image
     ? { inlineData:{ mimeType:p.image.mediaType, data:p.image.b64 } }
     : { text:p.text });
@@ -919,7 +953,8 @@ async function geminiJSON(system, parts, schema, modelOverride){
 /* ── 공통 진입점 ── */
 async function llmJSON(system, parts, schema){
   if(!LS.get('mf_key')) throw new ApiErr('no_key','API 키가 설정되지 않았어요.');
-  return provider()==='gemini' ? geminiJSON(system, parts, schema) : anthropicJSON(system, parts, schema);
+  if(provider()!=='gemini') return anthropicJSON(system, parts, schema);
+  return withModelFallback(m=>geminiJSON(system, parts, schema, m), briefModel);
 }
 /* 스트리밍 중에는 완성된 JSON이 아니라 조각이 온다: {"reply":"대통령님, 현…
    따옴표·이스케이프를 직접 훑어 reply 값만 부분 추출한다. 끝나지 않은 이스케이프는 잘라 버린다. */
@@ -1113,7 +1148,11 @@ function officeSystem(){
 - 대통령이 명시적으로 결정을 내렸거나 기록을 요청했을 때만 제안을 만든다.
 - 매 답변마다 제안을 만들지 않는다. 이번 대화에서 확정된 것이 없으면 빈 배열로 둔다.
 - note = 다음 정산에 넘길 확정 사실, goal = 목표 금액·기한 변경, action = 최근 브리핑 액션의 이행 체크.
-- 한 답변에 제안은 최대 2개.`;
+- 한 답변에 제안은 최대 2개.
+- **goal 제안의 goalLabel은 반드시 '수정_가능한_목표_이름' 배열에 있는 문자열을 그대로 써야 한다.**
+  그 배열에 없는 대상(로드맵 문구, 독트린의 장기 목표, 아직 만들지 않은 목표 등)은 goal로 제안할 수 없다.
+  그런 경우엔 kind를 note로 바꿔 '무엇을 어떻게 바꾸기로 했다'는 사실만 기록으로 남긴다.
+- 배열이 비어 있으면 goal 제안을 아예 만들지 않는다.`;
 }
 /* onText를 주면 스트리밍(제미나이 한정). 안 주면 기존처럼 한 번에 받는다. */
 async function callOffice(onText){
@@ -1121,9 +1160,11 @@ async function callOffice(onText){
   const system = officeSystem();
   const parts = [{ text: JSON.stringify(officePayload(), null, 1) }];
   if(provider() !== 'gemini') return anthropicJSON(system, parts, CHAT_SCHEMA);
-  const model = officeModel();
-  if(typeof onText === 'function') return geminiStream(system, parts, CHAT_SCHEMA, model, onText);
-  return geminiJSON(system, parts, CHAT_SCHEMA, model);
+  return withModelFallback(
+    m => typeof onText === 'function'
+      ? geminiStream(system, parts, CHAT_SCHEMA, m, onText)
+      : geminiJSON(system, parts, CHAT_SCHEMA, m),
+    officeModel);
 }
 
 async function callExtract(images, ym){
@@ -1190,6 +1231,8 @@ function officePayload(){
       강제저축: cur.a.forced, 비상금: cur.a.emerg,
       계좌: cur.a.accounts || null, 최근6개월: hist, 목표: goals,
     } : null,
+    /* goal 제안은 반드시 이 목록 안의 이름만 쓸 수 있다. 로드맵·독트린의 문구는 여기 없으면 수정 대상이 아니다. */
+    수정_가능한_목표_이름: goals.map(g=>g.이름),
     확정_기록: notesForSend(),
     최근_브리핑_액션: b && b.actions ? {
       briefId: bym,
@@ -1281,8 +1324,16 @@ function applyProp(i, j){
       addNote(p.text);
     }else if(p.kind==='goal'){
       const goals = LS.get('mf_goals') || [];
-      const g = goals.find(x=>normName(x.label)===normName(p.goalLabel||''));
-      if(!g) throw new Error(`'${p.goalLabel||'?'}' 목표를 찾을 수 없어요.`);
+      const want = normName(p.goalLabel||'');
+      /* 이름이 조금 어긋나도 살린다: 완전일치 → 부분일치 */
+      let g = goals.find(x=>normName(x.label)===want);
+      if(!g && want) g = goals.find(x=>normName(x.label).includes(want) || want.includes(normName(x.label)));
+      if(!g){
+        const names = goals.map(x=>x.label).join(', ');
+        throw new Error(names
+          ? `'${p.goalLabel||'?'}'은(는) 목표 항목이 아니에요. 수정 가능한 목표: ${names}`
+          : `등록된 목표가 없어요. 자산 탭에서 목표를 먼저 만들어주세요.`);
+      }
       if(p.goalTarget!=null) g.target = p.goalTarget;
       if(p.goalDue!=null) g.due = p.goalDue;
       LS.set('mf_goals', goals);
