@@ -652,6 +652,15 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
   <button class="btn" onclick="addAccount()">추가</button>
 </div>
 
+<!-- 시트: 집무실 메뉴 -->
+<div class="sheet" id="sh-office">
+  <div class="sh-handle"></div>
+  <div class="sh-title">집무실</div>
+  <div class="sh-sub">대화 기록과 확정 기록을 관리해요</div>
+  <div id="notesList"></div>
+  <button class="btn ghost" style="margin-top:12px" onclick="confirmClearChat()">대화 초기화</button>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1242,6 +1251,38 @@ async function sendOffice(isRetry){
 /* 재전송은 사용자 메시지를 다시 쌓지 않는다 — 마지막 질문은 이미 mf_chat에 있고 페이로드가 포함한다 */
 function retryOffice(){ sendOffice(true); }
 
+function chatSub(){
+  const c = getChat();
+  if(!c.length) return '장관에게 아무 때나 물어보세요';
+  const last = c[c.length-1];
+  const n = getNotes().length;
+  const d = last.ts ? new Date(last.ts) : null;
+  const when = d && !isNaN(d) ? `${d.getMonth()+1}월 ${d.getDate()}일` : '최근';
+  return `${when}까지 ${c.length}개 대화${n?` · 확정 기록 ${n}건`:''}`;
+}
+function officeMenu(){ renderNotesList(); openSheet('sh-office'); }
+function renderNotesList(){
+  const n = getNotes();
+  const el = $('notesList');
+  if(!n.length){
+    el.innerHTML = `<div class="card" style="font-size:12.5px;color:var(--ink3);line-height:1.8">아직 확정 기록이 없어요.<br>대화 중 장관의 제안을 재가하면 여기에 쌓이고, 다음 정산에 반영돼요.</div>`;
+    return;
+  }
+  el.innerHTML = `<div class="sec-title">확정 기록 <span class="s">${n.length}건 · 최근 ${NOTES_SEND_MAX}건까지 장관에게 전달</span></div>
+    <div class="acc-tbl">${n.map((x,i)=>`<div class="acc-r">
+      <div class="an" style="flex:1">${esc(x.text)}</div>
+      <button class="ov-menu" style="width:28px;height:28px;font-size:13px;background:var(--sur2);border:none;border-radius:9px;color:var(--ink3)" onclick="delNote(${i});renderNotesList();">✕</button>
+    </div>`).join('')}</div>`;
+}
+function confirmClearChat(){
+  if(!confirm('대화를 모두 지울까요?\n확정 기록은 그대로 남습니다.')) return;
+  clearChat();
+  renderChat();
+  closeAllSheets();
+  renderMin();
+  toast('대화를 초기화했어요');
+}
+
 function setAmtMode(m){
   amtMode = m; localStorage.setItem('amtMode', m);
   $('pill-round').classList.toggle('on', m==='round');
@@ -1759,6 +1800,14 @@ function renderMin(){
       <button class="btn ghost" onclick="startWizard()">다른 달 정산 · 재정산</button>
     </div>`;
   }
+  /* 집무실 */
+  h += `<div class="card" onclick="openOffice()" style="display:flex;align-items:center;gap:12px">
+    <div style="flex:1">
+      <div style="font-size:14px;font-weight:800;margin-bottom:3px">집무실</div>
+      <div style="font-size:11.5px;color:var(--ink3)">${esc(chatSub())}</div>
+    </div>
+    <div style="color:var(--ink4);font-size:17px">›</div>
+  </div>`;
   /* 총괄 브리핑 */
   if(!getBrief('batch')){
     h += `<div class="card">
