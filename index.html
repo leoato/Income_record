@@ -913,6 +913,47 @@ const BRIEF_SCHEMA = {
   },
 };
 
+/* 집무실 응답 — nullable은 반드시 anyOf 형태로. toGeminiSchema가 anyOf만 nullable로 변환한다 */
+const CHAT_SCHEMA = {
+  type:'object', additionalProperties:false, required:['reply','proposals'],
+  properties:{
+    reply:{ type:'string', description:"장관 어투 답변. '대통령님'으로 시작, 2~5문단, 문단 사이 빈 줄" },
+    proposals:{ type:'array', description:'재가가 필요한 제안. 없으면 빈 배열', items:{
+      type:'object', additionalProperties:false,
+      required:['kind','label','text','goalLabel','goalTarget','goalDue','actionIdx'],
+      properties:{
+        kind:{ type:'string', enum:['note','goal','action'] },
+        label:{ type:'string', description:'재가 카드에 표시할 한 줄 요약' },
+        text:{ anyOf:[{type:'string'},{type:'null'}], description:'kind가 note일 때 확정 기록에 남길 문장' },
+        goalLabel:{ anyOf:[{type:'string'},{type:'null'}], description:'kind가 goal일 때 대상 목표의 이름' },
+        goalTarget:{ anyOf:[{type:'number'},{type:'null'}], description:'kind가 goal일 때 새 목표 금액(원). 안 바꾸면 null' },
+        goalDue:{ anyOf:[{type:'string'},{type:'null'}], description:'kind가 goal일 때 새 기한 YYYY-MM-DD. 안 바꾸면 null' },
+        actionIdx:{ anyOf:[{type:'number'},{type:'null'}], description:'kind가 action일 때 최근_브리핑_액션의 i 값' },
+      },
+    }},
+  },
+};
+function officeSystem(){
+  return doctrine() + `
+[집무실 지침]
+- 여기는 월말 정산이 아니라 상시 집무실이다. 대통령의 질문에 답한다.
+- 숫자는 아래 재정_현황과 확정_기록에 있는 것만 인용하고, 계산 과정을 검산해서 제시한다.
+- 원장에 없는 숫자는 지어내지 않는다. 모르면 모른다고 답한다.
+- 개인화된 투자 권유는 하지 않는다. 대통령 본인의 독트린·로드맵에 근거한 정리와 중립적 선택지를 제시하고, 결정은 대통령의 몫으로 남긴다.
+- 확정_기록의 내용은 이미 합의된 사실로 취급한다.
+- reply는 '대통령님'으로 시작하는 장관 어투로 쓴다.
+
+[제안 규칙 — 엄격히 지킬 것]
+- proposals의 기본값은 빈 배열이다.
+- 대통령이 명시적으로 결정을 내렸거나 기록을 요청했을 때만 제안을 만든다.
+- 매 답변마다 제안을 만들지 않는다. 이번 대화에서 확정된 것이 없으면 빈 배열로 둔다.
+- note = 다음 정산에 넘길 확정 사실, goal = 목표 금액·기한 변경, action = 최근 브리핑 액션의 이행 체크.
+- 한 답변에 제안은 최대 2개.`;
+}
+async function callOffice(){
+  return llmJSON(officeSystem(), [{ text: JSON.stringify(officePayload(), null, 1) }], CHAT_SCHEMA);
+}
+
 async function callExtract(images, ym){
   const parts = images.map(im=>({ image:im }));
   parts.push({ text:`이 캡처들은 ${ymLabel(ym)} 말 기준 토스 자산 스냅샷이다. 계좌별 잔액과 화면에 표시된 총 자산을 추출하라.` });
