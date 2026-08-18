@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>재무부 장관 — 사용 안내 · 지원</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif;max-width:720px;margin:0 auto;padding:32px 20px 80px;line-height:1.75;color:#191F28;background:#fff}
+h1{font-size:24px;margin:0 0 6px;letter-spacing:-.5px}
+.sub{color:#8B95A1;font-size:13.5px;margin-bottom:28px}
+h2{font-size:17px;margin:32px 0 10px;padding-top:18px;border-top:1px solid #F2F4F6}
+p,li{font-size:14.5px;color:#4E5968}
+ul,ol{padding-left:20px}
+strong{color:#191F28}
+.box{background:#F9FAFB;border-radius:12px;padding:14px 16px;font-size:14px;margin:14px 0}
+.q{font-weight:700;color:#191F28;margin-top:18px}
+a{color:#3182F6}
+code{background:#F2F4F6;border-radius:5px;padding:1px 6px;font-size:13px}
+</style>
+</head>
+<body>
+<h1>재무부 장관 — 사용 안내</h1>
+<div class="sub">내 자산을 '국정'처럼 운영하는 개인 재무 기록 앱 · 지원 문의: <a href="mailto:leoato@naver.com">leoato@naver.com</a></div>
+
+<p>매달 말 자산 화면을 캡처해 올리면, AI가 계좌별 잔액을 읽어 정리하고 전월 대비 변화를 담은 '장관 브리핑'을 써 줍니다. 모든 기록은 기기에만 저장됩니다.</p>
+
+<h2>처음 시작하기</h2>
+<ol>
+  <li><strong>둘러보기</strong> — 장관 탭 → <em>키 없이 데모로 둘러보기</em>. 가상 자료로 모든 화면을 미리 볼 수 있어요.</li>
+  <li><strong>API 키 등록</strong> — 설정(⚙) → AI API 키. Gemini·ChatGPT·Claude 중 <strong>하나만</strong> 있으면 됩니다.</li>
+  <li><strong>월말 정산</strong> — 장관 탭 → 정산 시작 → 자산 화면 캡처 선택 → 판독 결과 확인 → 브리핑 받기.</li>
+</ol>
+
+<h2>API 키는 어디서 받나요</h2>
+<ul>
+  <li><strong>Gemini</strong> — <a href="https://aistudio.google.com/apikey">aistudio.google.com/apikey</a> (키가 <code>AQ.</code> 또는 <code>AIza</code>로 시작)</li>
+  <li><strong>ChatGPT</strong> — <a href="https://platform.openai.com/api-keys">platform.openai.com/api-keys</a> (<code>sk-</code>로 시작)</li>
+  <li><strong>Claude</strong> — <a href="https://console.anthropic.com/settings/keys">console.anthropic.com</a> (<code>sk-ant-</code>로 시작)</li>
+</ul>
+<div class="box">키를 붙여넣고 <strong>검증</strong>을 누르면 어느 회사 키인지 자동으로 알아보고, 그 계정이 쓸 수 있는 <strong>가장 최신 모델</strong>을 골라 줍니다. 키는 이 기기에만 저장되며 앱 제작자에게 전송되지 않습니다.</div>
+
+<h2>자주 묻는 질문</h2>
+<div class="q">Q. 요금이 드나요?</div>
+<p>앱은 무료입니다. AI 사용료는 이용자가 등록한 본인 API 계정으로 청구됩니다(월말 정산 1회는 보통 소액). 키를 넣지 않으면 AI 기능만 잠기고 기록·통계는 그대로 씁니다.</p>
+
+<div class="q">Q. 데이터는 어디에 저장되나요?</div>
+<p>기기 안에만 저장됩니다. 서버도 계정도 없습니다. 기기를 바꾸거나 앱을 지우면 사라지니 <strong>설정 → 전체 백업(JSON)</strong>으로 파일을 보관하세요. 새 기기에서는 <strong>백업 복원</strong>으로 되돌립니다.</p>
+
+<div class="q">Q. 캡처를 올렸는데 합계가 안 맞아요.</div>
+<p>판독 확인 화면에서 숫자를 직접 고칠 수 있습니다. 합계가 캡처의 '총 자산'과 일치해야 다음으로 넘어가도록 막아 두었습니다 — 잘못된 숫자가 기록에 남지 않게 하기 위해서입니다.</p>
+
+<div class="q">Q. '키가 유효하지 않다'고 나옵니다.</div>
+<p>키가 잘린 채 복사됐거나, 사용 제한(웹사이트·IP 제한)이 걸린 키일 수 있습니다. 앱이 알려주는 문구에 원인이 함께 표시되니 그대로 따라 해 보세요. 그래도 안 되면 새 키를 발급해 주세요.</p>
+
+<div class="q">Q. 어떤 모델을 쓰나요?</div>
+<p>등록한 키의 계정에서 쓸 수 있는 모델 목록을 받아 최신·상위 모델을 자동으로 고릅니다. 모델이 단종되면 다음 요청 때 자동으로 다시 고릅니다.</p>
+
+<div class="q">Q. 데모 데이터를 지우고 싶어요.</div>
+<p>설정 → 데모 → <em>데모 데이터 지우기</em>. 내 기록만 남습니다.</p>
+
+<h2>문의</h2>
+<p>버그 제보·기능 제안: <a href="mailto:leoato@naver.com">leoato@naver.com</a><br>
+개인정보처리방침: <a href="privacy.html">privacy.html</a></p>
+</body>
+</html>

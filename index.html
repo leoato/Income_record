@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="재무부장관">
@@ -408,6 +408,13 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
 /* toast */
 .toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--ink);color:#fff;border-radius:14px;padding:12px 20px;font-size:13px;font-weight:600;z-index:99;opacity:0;transition:all .22s;pointer-events:none;max-width:86%;text-align:center;}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* ══ iOS 보정 — 사파리/WKWebView에서만 적용 ══
+   입력 글자가 16px 미만이면 포커스 때 화면이 확대된다. 셀렉터 특이성에 밀리지 않게 !important로 못 박는다. */
+@supports (-webkit-touch-callout: none){
+  input, textarea, select, .inp, textarea.inp, .ext-r input{ font-size:max(16px,1em) !important; }
+  body{ -webkit-text-size-adjust:100%; }
+}
 </style>
 </head>
 <body>
@@ -2451,7 +2458,7 @@ function targetYm(){
 }
 function renderMin(){
   const b = $('minBody');
-  if(!LS.get('mf_key')){
+  if(!LS.get('mf_key') && !isDemo()){
     b.innerHTML = `<div class="card lock-card">
       <div class="lock-ic"><svg viewBox="0 0 24 24" style="width:38px;height:38px;stroke:var(--blue);fill:none;stroke-width:1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
       <div class="lock-t">장관 임명이 필요합니다</div>
@@ -2474,7 +2481,13 @@ function renderMin(){
   const monthEnd = (()=>{ const [y,m]=tym.split('-').map(Number); return `${y}-${String(m).padStart(2,'0')}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`; })();
   const dEnd = dday(monthEnd);
   let h = '';
-  if(!done){
+  if(!LS.get('mf_key')){
+    h += `<div class="cta-card">
+      <div class="cta-t">데모로 둘러보는 중 <span class="badge">예시 자료</span></div>
+      <div class="cta-d">아래 브리핑·로드맵은 앱을 소개하기 위한 가상 자료예요.<br>내 자산으로 실제 정산을 하려면 API 키만 등록하면 됩니다.</div>
+      <button class="btn" onclick="openSettings()">API 키 등록하고 시작하기</button>
+    </div>`;
+  } else if(!done){
     h += `<div class="cta-card">
       <div class="cta-t">${ymLabel(tym)} 정산</div>
       <div class="cta-d">${dEnd>0?`말일까지 D-${dEnd} · 말일(또는 다음날 새벽) 캡처 기준으로 정산해요`:dEnd===0?'오늘이 말일! 자산 캡처를 찍고 정산하세요':'말일이 지났어요 — 말일 즈음 찍은 캡처로 정산하세요'}</div>
