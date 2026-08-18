@@ -327,6 +327,24 @@ table.simple tr:last-child td{border-bottom:none;}
 .prop.dismissed .pk{color:var(--ink3);}
 .prop.dismissed .pdone{color:var(--ink3);}
 
+/* 결재 기록 */
+.dec-sum{display:flex;gap:8px;margin:2px 0 14px;}
+.dec-sum span{flex:1;background:var(--paper);border-radius:12px;padding:11px 8px;text-align:center;font-size:11px;color:var(--ink3);font-weight:600;box-shadow:var(--shadow);}
+.dec-sum b{display:block;font-size:17px;color:var(--ink);margin-bottom:2px;}
+.dec-sum .hot b{color:var(--blue);}
+.dec-r{background:var(--paper);border-radius:14px;padding:13px 15px;margin-bottom:9px;box-shadow:var(--shadow);border-left:3px solid var(--line2);}
+.dec-r.applied{border-left-color:var(--good);}
+.dec-r.pending{border-left-color:var(--blue);}
+.dec-r.dismissed{opacity:.68;}
+.dec-h{display:flex;align-items:center;gap:7px;margin-bottom:5px;}
+.dec-k{font-size:10px;font-weight:800;letter-spacing:.5px;color:var(--ink3);}
+.dec-st{font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;background:var(--sur2);color:var(--ink3);}
+.dec-st.applied{background:var(--good-bg);color:var(--good);}
+.dec-st.pending{background:var(--blue-bg);color:var(--blue);}
+.dec-t{font-size:13.5px;font-weight:700;line-height:1.55;color:var(--ink);}
+.dec-d{font-size:12px;color:var(--ink2);line-height:1.6;margin-top:3px;}
+.dec-f{display:flex;justify-content:space-between;gap:8px;margin-top:8px;font-size:10.5px;color:var(--ink4);}
+
 /* 정산 마법사 */
 #ov-wizard{z-index:57;}
 .wz-prog{display:flex;gap:5px;margin-bottom:20px;}
@@ -506,6 +524,15 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
       onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();sendOffice();}"></textarea>
     <button class="chat-send" id="chatSend" onclick="sendOffice()">↑</button>
   </div>
+</div>
+
+<!-- 오버레이: 결재 기록 -->
+<div class="ovpage" id="ov-dec">
+  <div class="ov-hdr">
+    <button class="back-btn" onclick="closeOv('ov-dec')">‹</button>
+    <div><div class="t">결재 기록</div><div class="s">장관과 결정한 안건과 반영 위치</div></div>
+  </div>
+  <div id="decBody"></div>
 </div>
 
 <!-- 오버레이: 정산 마법사 -->
@@ -1335,6 +1362,12 @@ function renderChat(){
 }
 /* 제안 카드 — 장관은 제안만 하고, 재가해야 반영된다 */
 const PROP_LABEL = { note:'기록 제안', goal:'목표 변경 제안', goal_new:'새 목표 제안', action:'액션 이행 제안' };
+/* 재가하면 어디에 저장되는지 — 결재 기록에서 이걸 보여준다 */
+const PROP_DEST = {
+  note:'확정 기록에 저장', goal:'자산 탭 목표에 반영',
+  goal_new:'자산 탭에 목표 생성', action:'브리핑 체크리스트에 반영',
+};
+const PROP_GO = { note:'office', goal:'asset', goal_new:'asset', action:'min' };
 function propHTML(p, i, j){
   const k = PROP_LABEL[p.kind] || '제안';
   if(p.state==='applied'){
@@ -1350,6 +1383,7 @@ function dismissProp(i, j){
   const c = getChat();
   if(!c[i] || !c[i].props || !c[i].props[j]) return;
   c[i].props[j].state = 'dismissed';
+  c[i].props[j].decidedAt = new Date().toISOString();
   LS.set('mf_chat', c);
   renderChat();
 }
@@ -1411,9 +1445,10 @@ function applyProp(i, j){
     return;                                    // 실패하면 pending 유지
   }
   p.state = 'applied';
+  p.decidedAt = new Date().toISOString();
   LS.set('mf_chat', c);
   renderChat();
-  toast('재가 완료 — 반영했어요');
+  toast('재가 완료 — ' + (PROP_DEST[p.kind] || '반영했어요'));
 }
 
 function openOffice(){
@@ -1506,6 +1541,86 @@ async function sendOffice(isRetry){
 }
 /* 재전송은 사용자 메시지를 다시 쌓지 않는다 — 마지막 질문은 이미 mf_chat에 있고 페이로드가 포함한다 */
 function retryOffice(){ sendOffice(true); }
+
+/* 결재 기록 — 별도 저장소 없이 mf_chat에서 뽑는다 */
+function collectDecisions(){
+  const rows = [];
+  getChat().forEach((m,i)=>{
+    if(m.r!=='a' || !m.props) return;
+    m.props.forEach((p,j)=>rows.push({ p, i, j, at: p.decidedAt || m.ts || '' }));
+  });
+  const rank = { pending:0, applied:1, dismissed:1 };
+  return rows.sort((a,b)=>{
+    const r = rank[a.p.state||'pending'] - rank[b.p.state||'pending'];
+    if(r) return r;                       // 미결을 맨 위로
+    return String(b.at).localeCompare(String(a.at));   // 그다음 최신순
+  });
+}
+function decisionDetail(p){
+  if(p.kind==='note') return (p.text && p.text.trim()) || '';
+  if(p.kind==='goal' || p.kind==='goal_new'){
+    const bits = [];
+    if(p.goalLabel) bits.push(p.goalLabel);
+    if(p.goalTarget!=null) bits.push('목표 '+fmtMan(p.goalTarget));
+    if(p.goalDue) bits.push('기한 '+p.goalDue);
+    return bits.join(' · ');
+  }
+  return '';
+}
+function fmtWhen(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  if(isNaN(d)) return '';
+  return `${d.getMonth()+1}월 ${d.getDate()}일 ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+function openDecisions(){ renderDecisions(); openOv('ov-dec'); }
+function decisionGo(kind){
+  closeOv('ov-dec');
+  const to = PROP_GO[kind] || 'min';
+  if(to==='office'){ openOffice(); setTimeout(officeMenu, 220); }
+  else if(to==='asset'){ go('asset'); }
+  else { go('min'); }
+}
+function renderDecisions(){
+  const rows = collectDecisions();
+  const b = $('decBody');
+  if(!rows.length){
+    b.innerHTML = `<div class="card" style="font-size:12.5px;color:var(--ink3);line-height:1.9">아직 결재한 안건이 없어요.<br>집무실에서 장관이 제안을 올리면 여기에 쌓입니다.</div>`;
+    return;
+  }
+  const n = k=>rows.filter(r=>(r.p.state||'pending')===k).length;
+  let h = `<div class="dec-sum">
+    <span><b>${n('applied')}</b> 재가</span>
+    <span><b>${n('dismissed')}</b> 보류</span>
+    <span class="${n('pending')?'hot':''}"><b>${n('pending')}</b> 미결</span>
+  </div>`;
+  rows.forEach(r=>{
+    const p = r.p, st = p.state || 'pending';
+    const detail = decisionDetail(p);
+    const when = fmtWhen(r.at);
+    h += `<div class="dec-r ${st}" onclick="${st==='applied' ? `decisionGo('${p.kind}')` : `decisionOpenChat(${r.i})`}">
+      <div class="dec-h">
+        <span class="dec-k">${esc(PROP_LABEL[p.kind]||'제안')}</span>
+        <span class="dec-st ${st}">${st==='applied'?'재가':st==='dismissed'?'보류':'미결'}</span>
+      </div>
+      <div class="dec-t">${esc(p.label||'')}</div>
+      ${detail?`<div class="dec-d">${esc(detail)}</div>`:''}
+      <div class="dec-f">
+        <span>${st==='applied' ? esc(PROP_DEST[p.kind]||'') : st==='dismissed' ? '반영하지 않음' : '집무실에서 재가 대기 중'}</span>
+        <span>${esc(when)}</span>
+      </div>
+    </div>`;
+  });
+  b.innerHTML = h;
+}
+function decisionOpenChat(i){
+  closeOv('ov-dec');
+  openOffice();
+  setTimeout(()=>{
+    const rows = document.querySelectorAll('#chatBody .chat-row');
+    if(rows[i]) rows[i].scrollIntoView({ block:'center' });
+  }, 260);
+}
 
 function chatSub(){
   const c = getChat();
@@ -2106,6 +2221,16 @@ function renderMin(){
     <div style="flex:1">
       <div style="font-size:14px;font-weight:800;margin-bottom:3px">집무실</div>
       <div style="font-size:11.5px;color:var(--ink3)">${esc(chatSub())}</div>
+    </div>
+    <div style="color:var(--ink4);font-size:17px">›</div>
+  </div>`;
+  /* 결재 기록 */
+  const _dec = collectDecisions(), _pend = _dec.filter(r=>(r.p.state||'pending')==='pending').length;
+  h += `<div class="card" onclick="openDecisions()" style="display:flex;align-items:center;gap:12px">
+    <div style="flex:1">
+      <div style="font-size:14px;font-weight:800;margin-bottom:3px">결재 기록
+        ${_pend?`<span class="badge dark" style="margin-left:4px">미결 ${_pend}</span>`:''}</div>
+      <div style="font-size:11.5px;color:var(--ink3)">${_dec.length?`장관과 결정한 안건 ${_dec.length}건 · 어디에 반영됐는지 확인`:'장관이 올린 안건이 여기 쌓여요'}</div>
     </div>
     <div style="color:var(--ink4);font-size:17px">›</div>
   </div>`;
