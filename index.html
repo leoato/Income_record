@@ -108,9 +108,9 @@ input,textarea,select{font-family:inherit;}
 .dc .amt{font-size:10px;font-weight:700;color:var(--ink);}
 
 /* 시트 공통 */
-.backdrop{position:fixed;inset:0;background:rgba(25,31,40,.5);z-index:50;opacity:0;pointer-events:none;transition:opacity .25s;}
+.backdrop{position:fixed;inset:0;background:rgba(25,31,40,.5);z-index:58;opacity:0;pointer-events:none;transition:opacity .25s;}
 .backdrop.open{opacity:1;pointer-events:all;}
-.sheet{position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(105%);width:100%;max-width:430px;background:var(--paper);border-radius:24px 24px 0 0;z-index:51;padding:0 20px calc(env(safe-area-inset-bottom,0) + 24px);transition:transform .3s cubic-bezier(.32,1,.38,1);max-height:88vh;overflow-y:auto;}
+.sheet{position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(105%);width:100%;max-width:430px;background:var(--paper);border-radius:24px 24px 0 0;z-index:59;padding:0 20px calc(env(safe-area-inset-bottom,0) + 24px);transition:transform .3s cubic-bezier(.32,1,.38,1);max-height:88vh;overflow-y:auto;}
 .sheet.open{transform:translateX(-50%) translateY(0);}
 .sh-handle{width:40px;height:4px;background:var(--line2);border-radius:2px;margin:12px auto 18px;}
 .sh-title{font-size:19px;font-weight:800;margin-bottom:2px;letter-spacing:-.3px;}
@@ -781,7 +781,11 @@ function addNote(text){
 }
 function delNote(i){ const n = getNotes(); n.splice(i,1); LS.set('mf_notes', n); }
 /* 전송 상한 — 이게 없으면 '전송량 상수' 약속이 거짓이 된다 */
-function notesForSend(){ return getNotes().slice(-NOTES_SEND_MAX).map(n=>n.text); }
+const ymd = iso=>{ const d=new Date(iso); return isNaN(d) ? '' : `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+/* 날짜를 함께 보낸다 — 장관이 '언제 정한 건지' 알아야 같은 걸 다시 꺼내지 않는다 */
+function notesForSend(){
+  return getNotes().slice(-NOTES_SEND_MAX).map(n=>({ 날짜: ymd(n.ts), 내용: n.text }));
+}
 
 /*
    유틸
@@ -1209,7 +1213,16 @@ function officeSystem(){
 - action = 최근 브리핑 액션의 이행 체크. actionIdx에 해당 액션의 i 값을 넣는다.
 
 [중요] 로드맵 문구나 독트린의 장기 서술은 목표 항목이 아니다.
-그런 것을 바꾸기로 했다면 note로 사실만 남기거나, 진행률을 잴 수 있는 형태면 goal_new로 목표를 만든다.`;
+그런 것을 바꾸기로 했다면 note로 사실만 남기거나, 진행률을 잴 수 있는 형태면 goal_new로 목표를 만든다.
+
+[이미 처리한 안건 — 되풀이 금지]
+- '최근_결재_내역'은 지금까지 올린 안건과 그 결과다. 올리기 전에 반드시 대조한다.
+- 결과가 '재가됨'인 안건은 이미 반영이 끝났다. 같은 내용을 다시 제안하지 않는다.
+  이미 정해진 사실로 취급하고, 필요하면 답변 본문에서 언급만 한다.
+- 결과가 '보류됨'인 안건은 대통령이 거절한 것이다. 다시 올리지 않는다.
+  대통령이 먼저 그 얘기를 꺼냈을 때만 다시 제안할 수 있다.
+- 결과가 '미결'인 안건은 아직 카드가 화면에 떠 있다. 같은 것을 또 만들지 않는다.
+- '확정_기록'의 각 항목에는 날짜가 있다. 이미 기록된 사실은 다시 기록 제안하지 않는다.`;
 }
 /* onText를 주면 스트리밍(제미나이 한정). 안 주면 기존처럼 한 번에 받는다. */
 async function callOffice(onText){
@@ -1279,6 +1292,21 @@ function latestAssetWithAccounts(){
   const last = yms[yms.length-1];
   return last ? { ym:last, a:getAsset(last) } : null;
 }
+const DECISIONS_SEND_MAX = 25;
+/* 장관에게 보낼 결재 이력 — 무엇을 올렸고 대통령이 재가했는지 보류했는지 */
+function decisionsForSend(){
+  const rows = [];
+  getChat().forEach(m=>{
+    if(m.r!=='a' || !m.props) return;
+    m.props.forEach(p=>rows.push({
+      날짜: ymd(p.decidedAt || m.ts),
+      종류: p.kind,
+      안건: String(p.label||'').slice(0, 60),
+      결과: p.state==='applied' ? '재가됨' : p.state==='dismissed' ? '보류됨' : '미결',
+    }));
+  });
+  return rows.slice(-DECISIONS_SEND_MAX);
+}
 function officePayload(){
   const yms = allAssetYms();
   const cur = latestAssetWithAccounts();
@@ -1300,6 +1328,8 @@ function officePayload(){
     } : null,
     /* goal 제안은 반드시 이 목록 안의 이름만 쓸 수 있다. 로드맵·독트린의 문구는 여기 없으면 수정 대상이 아니다. */
     수정_가능한_목표_이름: goals.map(g=>g.이름),
+    /* 이미 올렸던 안건 — 같은 제안을 되풀이하지 않도록 */
+    최근_결재_내역: decisionsForSend(),
     확정_기록: notesForSend(),
     최근_브리핑_액션: b && b.actions ? {
       briefId: bym,
@@ -1571,7 +1601,8 @@ function fmtWhen(iso){
   if(!iso) return '';
   const d = new Date(iso);
   if(isNaN(d)) return '';
-  return `${d.getMonth()+1}월 ${d.getDate()}일 ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  const yr = d.getFullYear() !== new Date().getFullYear() ? `${d.getFullYear()}년 ` : '';
+  return `${yr}${d.getMonth()+1}월 ${d.getDate()}일 ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
 }
 function openDecisions(){ renderDecisions(); openOv('ov-dec'); }
 function decisionGo(kind){
@@ -1641,7 +1672,7 @@ function renderNotesList(){
   }
   el.innerHTML = `<div class="sec-title">확정 기록 <span class="s">${n.length}건 · 최근 ${NOTES_SEND_MAX}건까지 장관에게 전달</span></div>
     <div class="acc-tbl">${n.map((x,i)=>`<div class="acc-r">
-      <div class="an" style="flex:1">${esc(x.text)}</div>
+      <div class="an" style="flex:1">${esc(x.text)}<span class="note">${esc(ymd(x.ts))}</span></div>
       <button class="ov-menu" style="width:28px;height:28px;font-size:13px;background:var(--sur2);border:none;border-radius:9px;color:var(--ink3)" onclick="delNote(${i});renderNotesList();">✕</button>
     </div>`).join('')}</div>`;
 }
