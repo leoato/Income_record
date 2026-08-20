@@ -381,6 +381,35 @@ table.simple tr:last-child td{border-bottom:none;}
   .mf-dio .d-doc,.mf-dio .d-mk{transform:none;}
 }
 
+/* 정산 로딩 씬 — 장관이 직원들을 소집해 임무를 나눠준다 (루프) */
+.wz-scene{position:relative;width:340px;max-width:100%;height:140px;margin:4px auto 14px;
+  background:#EFE8D8;border-radius:14px;overflow:hidden;}
+.ws-stage{position:absolute;left:0;top:0;width:170px;height:70px;transform:scale(2);transform-origin:0 0;}
+.ws-stage img{image-rendering:pixelated;}
+.ws-floor{position:absolute;left:0;bottom:0;width:100%;height:15px;background:#8F7358;border-top:1px solid #7A6049;}
+.ws-desk{position:absolute;bottom:13px;width:24px;height:11px;background:#6D4A2E;}
+.ws-desk::after{content:'';position:absolute;left:2px;right:2px;top:-2px;height:2px;background:#82603E;}
+.ws-min{position:absolute;left:6px;bottom:15px;width:16px;height:26px;}
+.ws-stackdoc{position:absolute;width:12px;height:9px;}
+.ws-char{position:absolute;bottom:15px;width:12px;height:18px;}
+.ws-char .fl2{position:absolute;inset:0;}
+.ws-char img{position:absolute;left:0;top:0;width:12px;height:18px;}
+.ws-char img.f1{opacity:0;}
+.ws-char.walking .f0{animation:wsFA .24s steps(1) infinite;}
+.ws-char.walking .f1{animation:wsFB .24s steps(1) infinite;}
+.ws-char.work .fl2{animation:wsWork 1.1s steps(1,end) infinite;}
+.ws-deskdoc{position:absolute;width:11px;height:8px;animation:wsBlink 1.7s infinite;}
+.ws-fly{position:absolute;width:11px;height:8px;transition:left .38s ease, bottom .38s ease;}
+@keyframes wsFA{0%,49.9%{opacity:1}50%,100%{opacity:0}}
+@keyframes wsFB{0%,49.9%{opacity:0}50%,100%{opacity:1}}
+@keyframes wsWork{0%,100%{transform:translateY(0)}50%{transform:translateY(-1px)}}
+@keyframes wsBlink{0%,68%,100%{opacity:1}82%{opacity:.3}}
+.ws-fallback{display:none;}
+@media(prefers-reduced-motion:reduce){
+  .wz-scene{display:none!important}
+  .ws-fallback{display:flex;justify-content:center;padding:12px 0;}
+}
+
 /* 정산 마법사 */
 #ov-wizard{z-index:57;}
 .wz-prog{display:flex;gap:5px;margin-bottom:20px;}
@@ -1068,6 +1097,12 @@ const MF_PIX = {
   doc:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAKCAYAAACE2W/HAAAAPUlEQVR4nGMUEpP7z0AGYAERT+6cIkmTjIoZRCOMgw88QTMcrpFUW1kGn41PcBhImY1XL50mSRMIMJKbAAAfARi93chg3QAAAABJRU5ErkJggg==',
   stamp:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAYAAAAICAYAAADaxo44AAAAOElEQVR4nGNggAIhMbn/IAzjM8EY6AAsgawSxmZEFkQGLCBiew8niqBnyXfcdoB1PG/7iSGB0w4AWDENFZk/u/oAAAAASUVORK5CYII=',
   mark:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAYAAABWdVznAAAAWklEQVR4nGNkgIINGgr/GfCAgBsPGEE0EzGKkdUwIiuGmYIONiCpYUFWjMumACQ5uAZctmxAMwRDAyH/sBCygYGQBmw2IBtCciiBFRATDzADwRFHyN3EqsEKALrtMAtMLEC8AAAAAElFTkSuQmCC',
+  staff_a0:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAASCAYAAABvqT8MAAAAtUlEQVR4nGNkQAIaSjL/GbCAG/eeMMLYTIQUo8uxMKCBE6snMGADAsYhqDYgAyXPIqyaMDTATL+3vY+BoIYbSB5DBwLGIXA5DEUXVrSheN4gogqnQQxCYnL/E9IK/n/79AKMQWwhMbn/WJ0EkvALCMIwxC8gCCyHM1hBIKukA6crmHDKkKth04Z1DO9ePUINJZAbTcwswAJnTp2AK8AmzkSqkxhxmQ4D6PJgDcgKsGkg1RWUAQD7KE1vW9lDQwAAAABJRU5ErkJggg==',
+  staff_a1:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAASCAYAAABvqT8MAAAArElEQVR4nGNkQAIaSjL/GbCAG/eeMMLYTIQUo8uxMKCBE6snMGADAsYhqDYgAyXPIqyaMDTATL+3vY+BoIYbSB5DBwLGIXA5DEUXVrSheN4gogqnQQxCYnL/E9IK/n/79AKMQWwhMbn/WJ0EkvALCMIwxC8gCCyHM1hBIKukA6crmHDKkKth04Z1DO9ePcIeSiC3mphZoGg4c+oEigbqOwkdYDgJmyJkJ9EeAABHkDnmjGBP2wAAAABJRU5ErkJggg==',
+  staff_b0:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAASCAYAAABvqT8MAAAAtUlEQVR4nGNkQAIaSjL/GbCAG/eeMMLYTIQUo8uxMKCBE6snMGADAsYhqDYgAyXPIqyaMDTATL+3vY+BoIYbSB5DBwLGIXA5DEUXVrSheN4gogqnQQxCYnL/qyKs/n/79AKMQWwhMbn/WJ0EkshwksEwJMNJBiyHM1hBoCUtCKcrmHDKkKthxr4nDO9ePUINJZAbfXR4wAJbrnyBK8AmzkSqkxhxmQ4D6PJgDcgKsGkg1RWUAQCkqUzHI+WVFAAAAABJRU5ErkJggg==',
+  staff_b1:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAASCAYAAABvqT8MAAAArElEQVR4nGNkQAIaSjL/GbCAG/eeMMLYTIQUo8uxMKCBE6snMGADAsYhqDYgAyXPIqyaMDTATL+3vY+BoIYbSB5DBwLGIXA5DEUXVrSheN4gogqnQQxCYnL/qyKs/n/79AKMQWwhMbn/WJ0EkshwksEwJMNJBiyHM1hBoCUtCKcrmHDKkKthxr4nDO9ePWLEcBJIcMY+hv8+OjyU2cBAqQaMUNpy5QupZlAZAABYqjZU6Qm55QAAAABJRU5ErkJggg==',
+  staff_c0:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAASCAYAAABvqT8MAAAAtElEQVR4nGNkQAIaSjL/GbCAG/eeMMLYTIQUo8uxMKCBE6snMGADAsYhqDYgAyXPIqyaMDTATL+3vY+BoIYbSB5DBwLGIXA5DEUXVrSheN4gogqnQQxCYnL/TSIS/n/79AKMQWwhMbn/WJ0EklBycsIwRMnJCSyHM1hBwC6tAqcrmHDKkKvh3r59DO9ePUINJZAbRXS0wAJvrlyDK8AmzkSqkxhxmQ4D6PLgUAIx8AFC8tQFAIFQTDEeflprAAAAAElFTkSuQmCC',
+  staff_c1:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAASCAYAAABvqT8MAAAAq0lEQVR4nGNkQAIaSjL/GbCAG/eeMMLYTIQUo8uxMKCBE6snMGADAsYhqDYgAyXPIqyaMDTATL+3vY+BoIYbSB5DBwLGIXA5DEUXVrSheN4gogqnQQxCYnL/TSIS/n/79AKMQWwhMbn/WJ0EklBycsIwRMnJCSyHM1hBwC6tAqcrmHDKkKvh3r59DO9ePWLEcBJYcN++/yI6WpTZwECpBoxQenPlGqlmUBkAAG03NfqJBueLAAAAAElFTkSuQmCC',
 };
 const pixMin = pose=>`<img class="pix" src="${pose==='offer'?MF_PIX.min_offer:MF_PIX.min_stand}" style="width:32px;height:52px;display:block;margin:0 auto 10px" alt="">`;
 /* 재가 순간 — 카드 위에 도장이 떨어지고 결재 자국이 찍힌다 */
@@ -1093,6 +1128,125 @@ function playDiorama(){
     <img class="d-doc pix" src="${MF_PIX.doc}" alt="">
     <img class="d-st pix" src="${MF_PIX.stamp}" alt="">
     <img class="d-mk pix" src="${MF_PIX.mark}" alt="">`;
+}
+
+/* 정산 로딩 씬 — API가 끝날 때까지 무한 루프. wzSceneStop()이 유일한 종료 경로 */
+const WZS = { run: 0, timers: [], root: null };
+function wzSceneStop(){
+  WZS.run++;
+  WZS.timers.forEach(clearTimeout);
+  WZS.timers = [];
+  WZS.root = null;
+}
+function wzWait(ms){
+  const id = WZS.run;
+  return new Promise(res=>{
+    const t = setTimeout(()=>{ if(id === WZS.run) res(true); }, ms);
+    WZS.timers.push(t);
+  });
+}
+function wzAlive(){ return !!WZS.root; }
+function wzSceneStart(bodyId, note){
+  wzSceneStop();
+  const b = $(bodyId);
+  if(!b) return;
+  b.innerHTML = `<div class="wz-scene"><div class="ws-stage">
+      <div class="ws-floor"></div>
+      <div class="ws-desk" style="left:62px"></div>
+      <div class="ws-desk" style="left:98px"></div>
+      <div class="ws-desk" style="left:134px"></div>
+      <img class="ws-min pix" data-ws="min" src="${MF_PIX.min_stand}" alt="">
+      <img class="ws-stackdoc pix" data-ws="d0" src="${MF_PIX.doc}" style="left:26px;bottom:15px" alt="">
+      <img class="ws-stackdoc pix" data-ws="d1" src="${MF_PIX.doc}" style="left:27px;bottom:18px" alt="">
+      <img class="ws-stackdoc pix" data-ws="d2" src="${MF_PIX.doc}" style="left:28px;bottom:21px" alt="">
+    </div></div>
+    <div class="ws-fallback"><div class="spinner"></div></div>
+    <div class="spin-note">${note}</div>`;
+  WZS.root = b.querySelector('.ws-stage');
+  wzSceneRun();
+}
+function wzChar(color){
+  const d = document.createElement('div');
+  d.className = 'ws-char';
+  d.innerHTML = `<div class="fl2">
+    <img class="f0" src="${MF_PIX['staff_'+color+'0']}" alt="">
+    <img class="f1" src="${MF_PIX['staff_'+color+'1']}" alt=""></div>`;
+  return d;
+}
+function wzFace(el, dir){ const f = el.querySelector('.fl2'); if(f) f.style.transform = dir < 0 ? 'scaleX(-1)' : ''; }
+function wzMove(el, x, ms){
+  el.style.transition = 'left ' + ms + 'ms linear';
+  el.style.left = x + 'px';
+  el.classList.add('walking');
+  return wzWait(ms).then(ok=>{ if(ok && el.isConnected) el.classList.remove('walking'); return ok; });
+}
+function wzMinPose(pose){
+  const m = WZS.root && WZS.root.querySelector('[data-ws="min"]');
+  if(m) m.src = pose === 'offer' ? MF_PIX.min_offer : MF_PIX.min_stand;
+}
+async function wzSceneRun(){
+  const root = WZS.root;
+  if(!root) return;
+  const DESKX = [62, 98, 134];
+  const staff = [];
+  /* 1막 — 소집: 직원들이 하나씩 달려와 자료를 받고 자리로 간다 */
+  for(let i = 0; i < 3; i++){
+    if(!wzAlive() || WZS.root !== root) return;
+    const c = wzChar('abc'[i]);
+    c.style.left = '176px';
+    wzFace(c, -1);
+    root.appendChild(c);
+    if(!await wzMove(c, 26, 1500)) return;
+    wzMinPose('offer');
+    const stackDoc = root.querySelector('[data-ws="d' + (2 - i) + '"]');
+    if(stackDoc){
+      stackDoc.className = 'ws-fly pix';
+      void stackDoc.offsetWidth;
+      stackDoc.style.left = '30px'; stackDoc.style.bottom = '17px';
+    }
+    if(!await wzWait(420)) return;
+    if(stackDoc) stackDoc.remove();
+    wzMinPose('stand');
+    wzFace(c, 1);
+    if(!await wzMove(c, DESKX[i] - 9, 1250)) return;
+    const dd = document.createElement('img');
+    dd.className = 'ws-deskdoc pix';
+    dd.src = MF_PIX.doc;
+    dd.style.left = (DESKX[i] + 7) + 'px';
+    dd.style.bottom = '24px';
+    root.appendChild(dd);
+    c.classList.add('work');
+    staff.push(c);
+    if(!await wzWait(320)) return;
+  }
+  /* 2막 — 작업 루프: 보고 왕복·검토·장관 순찰. API가 끝날 때까지 반복 */
+  while(wzAlive() && WZS.root === root){
+    if(!await wzWait(2100)) return;
+    if(WZS.root !== root) return;
+    const ev = Math.floor(Math.random() * 3);
+    if(ev === 0 && staff.length){
+      /* 보고: 한 명이 장관에게 달려갔다 돌아온다 */
+      const k = Math.floor(Math.random() * staff.length);
+      const c = staff[k];
+      if(!c.isConnected) return;
+      c.classList.remove('work');
+      wzFace(c, -1);
+      if(!await wzMove(c, 26, 950)) return;
+      wzMinPose('offer');
+      if(!await wzWait(500)) return;
+      wzMinPose('stand');
+      wzFace(c, 1);
+      if(!await wzMove(c, DESKX[k] - 9, 950)) return;
+      if(c.isConnected) c.classList.add('work');
+    }else if(ev === 1){
+      /* 순찰: 장관이 잠깐 돌아본다 */
+      const m = root.querySelector('[data-ws="min"]');
+      if(m) m.style.transform = 'scaleX(-1)';
+      if(!await wzWait(800)) return;
+      if(m) m.style.transform = '';
+    }
+    /* ev 2: 아무 일 없음 — 책상 서류 깜빡임(CSS)만 계속 */
+  }
 }
 
 /*
@@ -2823,6 +2977,7 @@ function startWizard(){
   wzShow(1); openOv('ov-wizard');
 }
 function exitWizard(){
+  wzSceneStop();
   closeOv('ov-wizard');
   if(WZ.assetSaved){ renderAsset(); renderMin(); }
 }
@@ -2848,6 +3003,7 @@ function pickWzMonth(ym,el){
   $('wzMonth').textContent = ymLabel(ym);
 }
 function wzShow(n){
+  if(n !== 3 && n !== 6) wzSceneStop();
   WZ.step = n;
   for(let i=1;i<=7;i++) $('wz'+i)?.classList.toggle('on',i===n);
   $('wzProg').innerHTML = Array.from({length:7},(_,i)=>`<div class="seg${i<n?' on':''}"></div>`).join('');
@@ -2883,7 +3039,7 @@ function removeThumb(i){ WZ.images.splice(i,1); renderThumbs(); }
 /* 판독 */
 async function startExtract(){
   wzShow(3);
-  $('wz3body').innerHTML = `<div class="spinner"></div><div class="spin-note">캡처를 판독하고 계좌별 잔액을 추출하고 있어요.<br>수십 초 걸릴 수 있습니다.</div>`;
+  wzSceneStart('wz3body', '장관이 직원들을 소집해 캡처 판독을 지시하고 있어요.<br>수십 초 걸릴 수 있습니다.');
   try{
     const r = await callExtract(WZ.images, WZ.ym);
     WZ.ext = { total: r.total_displayed, accounts: (r.accounts||[]).map(a=>({ g:a.group, n:a.name, v:a.balance, note:a.note||undefined })) };
@@ -2891,6 +3047,7 @@ async function startExtract(){
     renderExt();
     wzShow(4);
   }catch(e){
+    wzSceneStop();
     $('wz3body').innerHTML = `<div class="err-box">${esc(e.message||'판독 실패')}</div>
       <button class="btn" onclick="startExtract()">다시 시도</button>
       <div style="height:9px"></div>
@@ -2962,7 +3119,7 @@ function collectNotes(){
 }
 async function startBrief(){
   wzShow(6);
-  $('wz6body').innerHTML = `<div class="spinner"></div><div class="spin-note">전월 대비 변동을 계산하고 로드맵과 대조해<br>브리핑을 작성하고 있어요. 1~3분 걸릴 수 있습니다.</div>`;
+  wzSceneStart('wz6body', '전월 대비 변동을 계산하고 로드맵과 대조해<br>브리핑을 작성하고 있어요. 1~3분 걸릴 수 있습니다.');
   try{
     const asset = getAsset(WZ.ym);
     const r = await callBrief(WZ.ym, asset, collectNotes());
@@ -2971,6 +3128,7 @@ async function startBrief(){
     wzShow(7);
     playDiorama();
   }catch(e){
+    wzSceneStop();
     $('wz6body').innerHTML = `<div class="err-box">${esc(e.message||'브리핑 생성 실패')}<br><br>자산 스냅샷은 이미 저장됐어요 — 브리핑만 다시 요청하면 됩니다.</div>
       <button class="btn" onclick="startBrief()">브리핑 다시 요청</button>
       <div style="height:9px"></div>
