@@ -344,6 +344,43 @@ table.simple tr:last-child td{border-bottom:none;}
 .dec-d{font-size:12px;color:var(--ink2);line-height:1.6;margin-top:3px;}
 .dec-f{display:flex;justify-content:space-between;gap:8px;margin-top:8px;font-size:10.5px;color:var(--ink4);}
 
+/* 픽셀 캐릭터 연출 */
+.pix{image-rendering:pixelated;}
+.cta-card.has-min{position:relative;padding-right:74px;}
+.cta-card .mf-idle{position:absolute;right:18px;bottom:16px;width:32px;height:52px;}
+.cta-card .mf-idle.bob{animation:mfBob 2.6s steps(1,end) infinite;}
+@keyframes mfBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+/* 재가 도장 이펙트 — 카드 위에 잠깐 얹었다 스스로 사라진다 */
+.mf-fx{position:fixed;z-index:300;pointer-events:none;}
+.mf-fx .fl{position:absolute;inset:-5px;background:#fff;border-radius:14px;opacity:0;animation:fxFlash .2s .22s forwards;}
+.mf-fx .st{position:absolute;left:50%;top:-36px;width:24px;height:32px;transform:translateX(-50%);
+  animation:fxDrop .22s cubic-bezier(.6,0,.9,1) forwards, fxFade .2s .55s forwards;}
+.mf-fx .mk{position:absolute;left:50%;top:50%;width:44px;height:44px;opacity:0;
+  animation:fxPop .3s .2s cubic-bezier(.2,1.5,.4,1) forwards, fxFade .25s 1.05s forwards;}
+@keyframes fxDrop{to{transform:translateX(-50%) translateY(34px)}}
+@keyframes fxPop{0%{opacity:0;transform:translate(-50%,-50%) scale(2) rotate(-16deg)}
+  60%{opacity:1;transform:translate(-50%,-50%) scale(.9) rotate(-8deg)}
+  100%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(-8deg)}}
+@keyframes fxFlash{0%{opacity:.45}100%{opacity:0}}
+@keyframes fxFade{to{opacity:0}}
+/* 정산 완료 미니 디오라마 */
+.mf-dio{position:relative;width:156px;height:74px;margin:0 auto;}
+.mf-dio img{position:absolute;bottom:0;}
+.mf-dio .d-min{left:2px;width:32px;height:52px;}
+.mf-dio .d-doc{left:58px;bottom:4px;width:28px;height:20px;opacity:0;animation:dioShow .01s .35s forwards;}
+.mf-dio .d-pr{right:0;width:60px;height:32px;}
+.mf-dio .d-st{left:60px;bottom:30px;width:18px;height:24px;opacity:0;
+  animation:dioShow .01s .6s forwards, dioDrop .2s .7s cubic-bezier(.6,0,.9,1) forwards, fxFade .2s 1.15s forwards;}
+.mf-dio .d-mk{left:52px;bottom:2px;width:34px;height:34px;opacity:0;
+  animation:fxPop .3s 1s cubic-bezier(.2,1.5,.4,1) forwards;}
+@keyframes dioShow{to{opacity:1}}
+@keyframes dioDrop{to{transform:translateY(12px)}}
+@media(prefers-reduced-motion:reduce){
+  .cta-card .mf-idle.bob,.mf-fx .st,.mf-fx .mk,.mf-fx .fl,.mf-dio .d-st{animation:none!important}
+  .mf-fx .mk,.mf-dio .d-doc,.mf-dio .d-mk{opacity:1;animation:none!important;transform:translate(-50%,-50%) rotate(-8deg);}
+  .mf-dio .d-doc,.mf-dio .d-mk{transform:none;}
+}
+
 /* 정산 마법사 */
 #ov-wizard{z-index:57;}
 .wz-prog{display:flex;gap:5px;margin-bottom:20px;}
@@ -730,7 +767,7 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
   <!-- ⑦ 완료 -->
   <div class="wz-step" id="wz7">
     <div class="done-hero">
-      <div class="big">✓</div>
+      <div class="mf-dio" id="wzDio"></div>
       <div class="t" id="wzDoneTitle">정산 완료</div>
       <div class="d">자산 스냅샷이 저장되고<br>장관 브리핑이 도착했습니다.</div>
       <button class="btn" onclick="finishWizard()">브리핑 보기</button>
@@ -1019,6 +1056,44 @@ function dday(dateStr){ const t=new Date(); t.setHours(0,0,0,0); const d=new Dat
 function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 let _tt;
 function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(_tt); _tt=setTimeout(()=>t.classList.remove('show'), msg.length>40?6000:2800); }
+
+/*
+   픽셀 캐릭터 (스플래시와 같은 도트 — 앱 본편 연출용)
+*/
+const MF_PIX = {
+  min_stand:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAaCAYAAAC+aNwHAAAA50lEQVR4nGNkQANScmr/GXCAZ49uMaKLMRGrGZc8E7GacaljwaXw2vo2nIYIGIdguoBYzSDw4eya/zhd8OPHDwYlzyK8Btzb3offBcQAmCtY8JmODwgYhzCiuOAZljgmpBnDBc8ghvwnRiMMMGJTeGFFG4ohBhFVOF3HiMwREpP7/+TOKQbtgAYMhR+vbGN49+oR7qQsJCb3n1/HC5dFDCA5kBqcBpALmNAFsDmfJANIBUzEKiQYiOQCJhgDZDrIFlJsx5oXPr96AKb/vbrGwCSmRbwLyAVMQ98ARhgDWzpHB7higiIAALnIUTDz5E73AAAAAElFTkSuQmCC',
+  min_offer:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAaCAYAAAC+aNwHAAAA9ElEQVR4nGNkQANScmr/GXCAZ49uMaKLMRGrGZc8E7GacaljwaXw2vo2nIYIGIdguoBYzSDw4eya/zhd8OPHDwYlzyK8Btzb3offBcQAmCtY8JmODwgYhzCiuOAZljgmpBnDBc8ghvwnRiMMMGJTeGFFG4ohBhFVOF3HiMwREpP7/+TOKQbtgAYMhR+vbGN49+oR7qQsJCb3n1/HC5dFDCA5kBp0cRYGEgGyISAXMaErwOZ89GhGjmoWUl2AnkpZiNVIMBDJBUwwBsh0kC2k2I7VC59fPQDT/15dY2AS0yLeBeQCpqFvACOMgS2dowNcMUERAAB7UlpZDfMhdwAAAABJRU5ErkJggg==',
+  pres0:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAQCAYAAAABOs/SAAAAxUlEQVR4nGNkoABIyan9xyX37NEtRnx6mWhhKTHyTLSwlBh1LORYfG19G4aYVmAVSWYwkmrph7Nr8PoW3QG44pqJgUyg5FlEdGhQ1eJ72/vI1UqexQLGIURHD74sxchAJgDF9YPbt+B8BVU1khzGSI6lQmJy//l1vBiubmhg0A5owKrm45VtDO9ePWKkWlALIVlKCWCiRDMu3xIDWIjxIbUtJWgxyFLkbIMr71Ld4nevHjEqeRYRVS5T1WKY5ch8XEFPKgAAjIBAx51l4qMAAAAASUVORK5CYII=',
+  pres2:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAQCAYAAAABOs/SAAAAu0lEQVR4nGNkoABIyan9xyX37NEtRnx6mWhhKTHyTLSwlBh1LORYfG19G4aYVmAVSWYwkmrph7Nr8PoW3QG44pqJgUyg5FlEdGhQ1eJ72/vI1UqexQLGIURHD74sxchAJgDF9YPbt+B8BVU1khzGSI6lQmJy//l1vBiubmhg0A5owKrm45VtDO9ePWKkWlALIVlKCWCiRDMu39LUYm0KLAUBFlDQMQwAYAERyHkSV8FAE4vRLcOXGqkVQgAcDTvG5435ygAAAABJRU5ErkJggg==',
+  doc:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAKCAYAAACE2W/HAAAAPUlEQVR4nGMUEpP7z0AGYAERT+6cIkmTjIoZRCOMgw88QTMcrpFUW1kGn41PcBhImY1XL50mSRMIMJKbAAAfARi93chg3QAAAABJRU5ErkJggg==',
+  stamp:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAYAAAAICAYAAADaxo44AAAAOElEQVR4nGNggAIhMbn/IAzjM8EY6AAsgawSxmZEFkQGLCBiew8niqBnyXfcdoB1PG/7iSGB0w4AWDENFZk/u/oAAAAASUVORK5CYII=',
+  mark:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAYAAABWdVznAAAAWklEQVR4nGNkgIINGgr/GfCAgBsPGEE0EzGKkdUwIiuGmYIONiCpYUFWjMumACQ5uAZctmxAMwRDAyH/sBCygYGQBmw2IBtCciiBFRATDzADwRFHyN3EqsEKALrtMAtMLEC8AAAAAElFTkSuQmCC',
+};
+const pixMin = pose=>`<img class="pix" src="${pose==='offer'?MF_PIX.min_offer:MF_PIX.min_stand}" style="width:32px;height:52px;display:block;margin:0 auto 10px" alt="">`;
+/* 재가 순간 — 카드 위에 도장이 떨어지고 결재 자국이 찍힌다 */
+function stampFX(target){
+  if(!target || !target.getBoundingClientRect) return;
+  const r = target.getBoundingClientRect();
+  const d = document.createElement('div');
+  d.className = 'mf-fx';
+  d.style.left = r.left+'px'; d.style.top = r.top+'px';
+  d.style.width = r.width+'px'; d.style.height = r.height+'px';
+  d.innerHTML = `<div class="fl"></div><img class="pix st" src="${MF_PIX.stamp}" alt=""><img class="pix mk" src="${MF_PIX.mark}" alt="">`;
+  document.body.appendChild(d);
+  setTimeout(()=>{ if(d.parentNode) d.parentNode.removeChild(d); }, 1400);
+}
+/* 정산 완료 화면 — 문서 전달→도장 미니 디오라마 (표시될 때마다 처음부터 재생) */
+function playDiorama(){
+  const el = $('wzDio');
+  if(!el) return;
+  el.innerHTML = '';
+  void el.offsetWidth;
+  el.innerHTML = `<img class="d-min pix" src="${MF_PIX.min_offer}" alt="">
+    <img class="d-pr pix" src="${MF_PIX.pres2}" alt="">
+    <img class="d-doc pix" src="${MF_PIX.doc}" alt="">
+    <img class="d-st pix" src="${MF_PIX.stamp}" alt="">
+    <img class="d-mk pix" src="${MF_PIX.mark}" alt="">`;
+}
 
 /*
    Claude API
@@ -1726,7 +1801,7 @@ function renderChat(){
   const b = $('chatBody');
   const c = getChat();
   if(!c.length){
-    b.innerHTML = `<div class="chat-empty">장관이 집무실에서 대기 중입니다.<br>재정 현황·목표·지난 브리핑을 모두 파악하고 있습니다.<br><br>예) "벙커 목표를 다시 계산해줘"<br>예) "지금 비상금 충족률이 어떻게 되지?"</div>`;
+    b.innerHTML = `<div class="chat-empty">${pixMin()}장관이 집무실에서 대기 중입니다.<br>재정 현황·목표·지난 브리핑을 모두 파악하고 있습니다.<br><br>예) "벙커 목표를 다시 계산해줘"<br>예) "지금 비상금 충족률이 어떻게 되지?"</div>`;
     return;
   }
   b.innerHTML = c.map((m,i)=>chatRowHTML(m,i)).join('');
@@ -1743,12 +1818,12 @@ const PROP_GO = { note:'office', goal:'asset', goal_new:'asset', action:'min' };
 function propHTML(p, i, j){
   const k = PROP_LABEL[p.kind] || '제안';
   if(p.state==='applied'){
-    return `<div class="prop done"><div class="pk">${k}</div><div class="pl">${esc(p.label)}</div><div class="pdone">재가 완료</div></div>`;
+    return `<div class="prop done" data-pij="${i}-${j}"><div class="pk">${k}</div><div class="pl">${esc(p.label)}</div><div class="pdone">재가 완료</div></div>`;
   }
   if(p.state==='dismissed'){
-    return `<div class="prop dismissed"><div class="pk">${k}</div><div class="pl">${esc(p.label)}</div><div class="pdone">보류</div></div>`;
+    return `<div class="prop dismissed" data-pij="${i}-${j}"><div class="pk">${k}</div><div class="pl">${esc(p.label)}</div><div class="pdone">보류</div></div>`;
   }
-  return `<div class="prop"><div class="pk">${k}</div><div class="pl">${esc(p.label)}</div>
+  return `<div class="prop" data-pij="${i}-${j}"><div class="pk">${k}</div><div class="pl">${esc(p.label)}</div>
     <div class="pb"><button class="ok" onclick="applyProp(${i},${j})">재가</button><button class="no" onclick="dismissProp(${i},${j})">보류</button></div></div>`;
 }
 function dismissProp(i, j){
@@ -1820,6 +1895,7 @@ function applyProp(i, j){
   p.decidedAt = new Date().toISOString();
   LS.set('mf_chat', c);
   renderChat();
+  stampFX(document.querySelector('[data-pij="'+i+'-'+j+'"]'));
   toast('재가 완료 — ' + (PROP_DEST[p.kind] || '반영했어요'));
 }
 
@@ -1958,7 +2034,7 @@ function renderDecisions(){
   const rows = collectDecisions();
   const b = $('decBody');
   if(!rows.length){
-    b.innerHTML = `<div class="card" style="font-size:12.5px;color:var(--ink3);line-height:1.9">아직 결재한 안건이 없어요.<br>집무실에서 장관이 제안을 올리면 여기에 쌓입니다.</div>`;
+    b.innerHTML = `<div class="card" style="font-size:12.5px;color:var(--ink3);line-height:1.9;text-align:center">${pixMin()}아직 결재한 안건이 없어요.<br>집무실에서 장관이 제안을 올리면 여기에 쌓입니다.</div>`;
     return;
   }
   const n = k=>rows.filter(r=>(r.p.state||'pending')===k).length;
@@ -2330,7 +2406,7 @@ function goalsHTML(assets){
   if(!latest) latest = assets[assets.length-1] || null;   // 총자산 기준은 계좌 상세가 없어도 계산된다
   const addBtn = `<button class="sec-add" onclick="openGoalSheet()">+ 목표 추가</button>`;
   if(!goals.length) return `<div class="sec-title">목표 ${addBtn}</div>
-    <div class="card" style="font-size:12.5px;color:var(--ink3);line-height:1.8">아직 목표가 없어요.<br>'+ 목표 추가'로 총자산·그룹·계좌 기준 목표를 만들면 진행률 게이지가 생겨요.</div>`;
+    <div class="card" style="font-size:12.5px;color:var(--ink3);line-height:1.8;text-align:center">${pixMin()}아직 목표가 없어요.<br>'+ 목표 추가'로 총자산·그룹·계좌 기준 목표를 만들면 진행률 게이지가 생겨요.</div>`;
   if(!latest) return '';
   let h = `<div class="sec-title">목표 <span class="s">${ymLabel(latest.ym)} 말 기준</span>${addBtn}</div>`;
   goals.forEach((g,gi)=>{
@@ -2591,13 +2667,15 @@ function renderMin(){
       <button class="btn" onclick="openSettings()">API 키 등록하고 시작하기</button>
     </div>`;
   } else if(!done){
-    h += `<div class="cta-card">
+    h += `<div class="cta-card has-min">
+      <img class="mf-idle pix" src="${MF_PIX.min_offer}" alt="">
       <div class="cta-t">${ymLabel(tym)} 정산</div>
       <div class="cta-d">${dEnd>0?`말일까지 D-${dEnd} · 말일(또는 다음날 새벽) 캡처 기준으로 정산해요`:dEnd===0?'오늘이 말일! 자산 캡처를 찍고 정산하세요':'말일이 지났어요 — 말일 즈음 찍은 캡처로 정산하세요'}</div>
       <button class="btn" onclick="startWizard()">정산 시작하기</button>
     </div>`;
   } else {
-    h += `<div class="cta-card">
+    h += `<div class="cta-card has-min">
+      <img class="mf-idle bob pix" src="${MF_PIX.min_stand}" alt="">
       <div class="cta-t">${ymLabel(tym)} 정산 <span class="badge ok">완료</span></div>
       <div class="cta-d" style="margin-bottom:12px">다음 정산은 다음 달 말일 전후</div>
       <button class="btn ghost" onclick="startWizard()">다른 달 정산 · 재정산</button>
@@ -2891,6 +2969,7 @@ async function startBrief(){
     saveBrief(makeBrief(WZ.ym, r));
     $('wzDoneTitle').textContent = `${ymLabel(WZ.ym)} 정산 완료`;
     wzShow(7);
+    playDiorama();
   }catch(e){
     $('wz6body').innerHTML = `<div class="err-box">${esc(e.message||'브리핑 생성 실패')}<br><br>자산 스냅샷은 이미 저장됐어요 — 브리핑만 다시 요청하면 됩니다.</div>
       <button class="btn" onclick="startBrief()">브리핑 다시 요청</button>
