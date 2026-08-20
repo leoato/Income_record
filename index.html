@@ -638,6 +638,14 @@ body.theme-cream .hdr h1{font-family:'Noto Serif KR',serif;font-weight:900;lette
 #mfGraph .gline{fill:none;stroke:#9a2b22;stroke-width:1.6;stroke-linecap:square;
   stroke-dasharray:100;stroke-dashoffset:100;}
 #mfGraph.draw .gline{transition:stroke-dashoffset .95s cubic-bezier(.4,0,.5,1);stroke-dashoffset:0;}
+#mfGraph .glabel{opacity:0;transition:opacity .25s ease;}
+#mfGraph .glabel.on{opacity:1;}
+#mfGraph .glabel rect{fill:#F5EFE0;stroke:#9a2b22;stroke-width:.9;transition:stroke .45s ease;}
+#mfGraph .glabel text{font-size:4.6px;font-weight:800;fill:#9a2b22;text-anchor:middle;
+  font-family:'Pretendard','Noto Sans KR',sans-serif;transition:fill .45s ease;}
+#mfGraph .glabel.safe rect{stroke:#0F7B4F;}
+#mfGraph .glabel.safe text{fill:#0F7B4F;}
+#mfGraph.out{opacity:0;transition:opacity .55s ease;}
 #mfBubA{left:6px;top:38px;width:104px;}
 #mfBubA::before{left:64px}#mfBubA::after{left:65px}
 #mfBubB{left:96px;top:44px;width:78px;}
@@ -688,6 +696,10 @@ body.theme-cream .hdr h1{font-family:'Noto Serif KR',serif;font-weight:900;lette
       <svg id="mfGraph" viewBox="0 0 46 26" width="46" height="26" aria-hidden="true">
         <rect class="gbox" x="1" y="1" width="44" height="24"></rect>
         <path class="gline" pathLength="100" d=""></path>
+        <g class="glabel">
+          <rect x="5" y="15.5" width="15" height="7" rx="1"></rect>
+          <text x="12.5" y="20.6">위험!</text>
+        </g>
       </svg>
       <div class="mf-bub" id="mfBubA"></div>
       <div class="mf-bub" id="mfBubB"></div>
@@ -3735,6 +3747,7 @@ renderCal();
   }
   function walkOut(){
     bubA.classList.remove('show');
+    if (gEl && gEl.classList.contains('on')) gEl.classList.add('out');
     body.style.transform = 'scaleX(-1)';
     pose('walk');
     min.style.transition = 'transform ' + WALK_OUT + 'ms linear';
@@ -3743,6 +3756,8 @@ renderCal();
   }
   /* 지수 → 로그 그래프. 두 곡선을 같은 점 개수로 만들어 사이를 섞는다 */
   var gEl = $('mfGraph'), gLine = gEl && gEl.querySelector('.gline'), gRaf = 0;
+  var gLab = gEl && gEl.querySelector('.glabel');
+  var gTxt = gLab && gLab.querySelector('text');
   function gPath(t){
     var N = 26, x0 = 5, x1 = 41, yLo = 21, yHi = 5, kE = 2.9, kL = 14, d = '';
     for (var i = 0; i < N; i++){
@@ -3762,12 +3777,23 @@ renderCal();
       gEl.classList.remove('draw');
       gEl.classList.add('on');
       void gEl.offsetWidth;                 /* 리플로우 — 선 그리기 재시작 */
-      if (reduce) { gEl.classList.add('draw'); return; }
+      if (gLab){
+        gLab.classList.remove('on', 'safe');
+        if (gTxt) gTxt.textContent = '위험!';
+      }
+      if (reduce) { gEl.classList.add('draw'); if (gLab) gLab.classList.add('on'); return; }
       setTimeout(function(){ gEl.classList.add('draw'); }, 260);
+      setTimeout(function(){ if (gLab) gLab.classList.add('on'); }, 900);
       return;
     }
     if (kind === 'log'){
-      if (reduce) { gLine.setAttribute('d', gPath(1)); return; }
+      var toSafe = function(){
+        if (!gLab) return;
+        gLab.classList.add('on', 'safe');
+        if (gTxt) gTxt.textContent = '안전?';
+      };
+      if (reduce) { gLine.setAttribute('d', gPath(1)); toSafe(); return; }
+      setTimeout(toSafe, 380);
       var t0 = 0, id = runId;
       var step = function(ts){
         if (id !== runId) return;
@@ -3825,7 +3851,8 @@ renderCal();
     });
     op('mfP0', 1); op('mfP1', 0); op('mfP2', 0);
     cancelAnimationFrame(gRaf);
-    if (gEl){ gEl.classList.remove('on'); gEl.classList.remove('draw'); }
+    if (gEl) gEl.classList.remove('on', 'draw', 'out');
+    if (gLab) gLab.classList.remove('on', 'safe');
     if (gLine) gLine.setAttribute('d', '');
     var w = $('mfWord'); if (w) w.classList.remove('show');
     void min.offsetWidth;                 /* 리플로우 — 애니메이션 재시작용 */
