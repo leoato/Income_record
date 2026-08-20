@@ -416,8 +416,111 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
   body{ -webkit-text-size-adjust:100%; }
 }
 </style>
+<style>
+
+/* 스플래시 — 집무실 결재 (픽셀, 옆모습). 타임라인은 JS가 돌린다 */
+#mfSplash{position:fixed;inset:0;z-index:99999;background:#161a20;
+  display:flex;align-items:center;justify-content:center;flex-direction:column;
+  gap:calc(7px * var(--mfz));overflow:hidden;cursor:pointer;
+  transition:opacity .5s ease, visibility .5s;--mfz:4;}
+#mfSplash.hide{opacity:0;visibility:hidden;pointer-events:none;}
+#mfSplash .mf-wrap{position:relative;width:calc(180px * var(--mfz));height:calc(120px * var(--mfz));}
+#mfSplash .mf-stage{position:absolute;top:0;left:0;width:180px;height:120px;
+  transform:scale(var(--mfz));transform-origin:0 0;animation:mfIn .35s ease both;}
+#mfSplash img{position:absolute;image-rendering:pixelated;}
+#mfSplash .mf-bg{left:0;top:0;width:180px;height:120px;}
+
+/* 장관 — 바깥은 이동, 안쪽은 좌우 반전 */
+#mfMin{position:absolute;left:6px;top:86px;width:16px;height:26px;}
+#mfMinBody{position:absolute;inset:0;}
+#mfMin img{left:0;top:0;width:16px;height:26px;opacity:0;}
+#mfMin.walk .mf-wa{opacity:1;animation:mfFA .26s steps(1) infinite;}
+#mfMin.walk .mf-wb{opacity:1;animation:mfFB .26s steps(1) infinite;}
+#mfMin.stand .mf-st{opacity:1;}
+#mfMin.offer .mf-of{opacity:1;}
+
+#mfP0{left:96px;top:78px;width:30px;height:16px;opacity:1;}
+#mfP1,#mfP2{left:96px;top:78px;width:30px;height:16px;opacity:0;}
+#mfDoc{left:84px;top:96px;width:14px;height:10px;opacity:0;
+  transition:transform .42s cubic-bezier(.3,.7,.4,1);}
+#mfDoc.fly{transform:translate(8px,-12px);}
+#mfStamp{left:97px;top:72px;width:6px;height:8px;opacity:0;
+  transition:transform .23s cubic-bezier(.6,0,.9,1), opacity .25s ease;}
+#mfStamp.down{transform:translateY(10px);}
+#mfStamp.gone{opacity:0!important;}
+#mfMark{left:93px;top:83px;width:12px;height:12px;opacity:0;}
+#mfMark.pop{animation:mfPop .32s cubic-bezier(.2,1.5,.4,1) both;}
+#mfFlash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;}
+#mfFlash.go{animation:mfFlash .2s ease-out both;}
+
+/* 말풍선 */
+#mfSplash .mf-bub{position:absolute;box-sizing:border-box;background:#F5EFE0;color:#171b23;
+  border:1px solid #14181f;padding:4px 5px 5px;font-size:6px;line-height:1.6;
+  font-weight:700;letter-spacing:-.01em;text-align:left;
+  opacity:0;transform:translateY(4px) scale(.86);
+  transition:opacity .18s ease, transform .24s cubic-bezier(.2,1.5,.4,1);}
+#mfSplash .mf-bub.show{opacity:1;transform:none;}
+#mfSplash .mf-bub b{color:#9a2b22;font-weight:800;}
+#mfSplash .mf-bub::before,#mfSplash .mf-bub::after{content:"";position:absolute;width:0;height:0;}
+#mfSplash .mf-bub::before{bottom:-7px;border-left:5px solid transparent;
+  border-right:5px solid transparent;border-top:7px solid #14181f;}
+#mfSplash .mf-bub::after{bottom:-5px;border-left:4px solid transparent;
+  border-right:4px solid transparent;border-top:5px solid #F5EFE0;}
+#mfBubA{left:6px;top:38px;width:104px;}
+#mfBubA::before{left:64px}#mfBubA::after{left:65px}
+#mfBubB{left:96px;top:44px;width:78px;}
+#mfBubB::before{left:18px}#mfBubB::after{left:19px}
+
+#mfSplash .mf-word{font-size:calc(7px * var(--mfz));letter-spacing:.34em;color:#e2d6b8;
+  font-weight:800;opacity:0;transform:translateY(9px);
+  transition:opacity .55s ease, transform .55s ease;}
+#mfSplash .mf-word.show{opacity:1;transform:none;}
+#mfSplash .mf-skip{position:absolute;bottom:calc(14px * var(--mfz) / 4);left:0;right:0;
+  text-align:center;font-size:11px;letter-spacing:.1em;color:#5d6675;
+  opacity:0;transition:opacity .6s ease;}
+#mfSplash .mf-skip.show{opacity:1;}
+
+@keyframes mfIn{from{opacity:0}to{opacity:1}}
+@keyframes mfFA{0%,49.9%{opacity:1}50%,100%{opacity:0}}
+@keyframes mfFB{0%,49.9%{opacity:0}50%,100%{opacity:1}}
+@keyframes mfPop{0%{opacity:0;transform:scale(2.2) rotate(-14deg)}
+  60%{opacity:1;transform:scale(.92) rotate(-6deg)}
+  100%{opacity:1;transform:scale(1) rotate(-6deg)}}
+@keyframes mfFlash{0%{opacity:.5}100%{opacity:0}}
+@media(max-width:900px){#mfSplash{--mfz:3}}
+@media(max-width:620px){#mfSplash{--mfz:2}}
+@media(prefers-reduced-motion:reduce){
+  #mfSplash .mf-stage,#mfMin.walk .mf-wa,#mfMin.walk .mf-wb,
+  #mfMark.pop,#mfFlash.go{animation:none!important}
+  #mfSplash .mf-bub,#mfDoc,#mfStamp,#mfSplash .mf-word{transition:none!important}
+}
+</style>
 </head>
 <body>
+<div id="mfSplash" role="status" aria-label="재무부 장관 시작 중">
+  <div class="mf-wrap">
+    <div class="mf-stage">
+      <img class="mf-bg" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAB4CAIAAADUhU+qAAAC0UlEQVR42u3cPWgTcRgH4L8hU7SgThKK4NLByUnEQQTFQRcHKXXp5BBQgpOULuJgqYIiQaGDUxYliDhYRUGRDi7uIkXQKRQJtbSms0PEhlLaNHfXu1yeZ7qE9C5cfn3f9z6Sfd++zJf2j4TI1ttr1pOz9RQCCAfCgXAgHAgHwoFwkA/FLZ+dGJ/MyPt73qj7kOLy4/ONTc8cO/1Y5UBbYQ/aykZ/mX3Vf0eYuhzxz308mQ4HedKZMCqVagjh4YO7Lryhcgy3U5O13l98ojRk4Yjx2NvBs7bCkLWVNx/eR/nzi+cuCISZI+eeVRa7H16dG9NWMHOgrUR0/NJ0Ly/7Oj8jBCoHwoG2ksr0LhwMvLjSX0z0urnL7u7n2NBsLv1fXqhVzlTnOsvl8hHB0lbyXGYHZaja3r16wdEKKkdwdks4CDvc/9erejWRcHTPm936mDcJzpCirYQsVCB366gcGEhDpLuC4/phNZUDhAPhQDgQDrJ5tBLxuvlCrWIXqxwMTeXo48vEWfvhd1QOhAPhQDgQDoQD4UA4QDgQDoQD4UA4EA6EA+Eg+FLT8Loy1YhrVS9mx1UOtBWEAzMHW1td/qVygHAgHAgHwoFwIBwIB8KBcCAcCAcIB8KBcJC04sd3b+2Fvff6ZSPdN9DL565yIBwIB3HOHIX1VXshhX/KtHd7L29A5cDd54Np+umnuFY1c+2scORN+WAMK2muqBz59eTWv4xcv7+y22VHKziUxUDKJt3dYbfL/Ydj7c+6XR9CaLeaO75m4mhsm1v6mewsudUWv3cWTo6Wuh9uF46RAyXJCCG0W1l8V9Xzo2YODKQYSAfRUmvNTlA5EA6EAzNHyhabv+Na1Vj5UHa25SQY/YbDSTC0lQTdvnm4++GdR8v52JaBFOFAW0lForU9xW2pHAgH2kpCIp5Nyuy2VA6cIcUZ0pD5qycGUoQD4QDhQDiIw18rZsLRi+5VOgAAAABJRU5ErkJggg==" alt="">
+      <div id="mfMin"><div id="mfMinBody">
+        <img class="mf-wa" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAaCAYAAAC+aNwHAAABE0lEQVR42q1Tqw7CQBCcXuohJ04gKhCIgiDpV4BCIPgOJAqF5DsQJDj4BxISBEEQQkhDEBUEgqniEHCEtrfX4zGyOzM7u91zkELJq0gQOIYbJ/2N2YqpOrMVUzyXIq4nA9KkGLT1I9iIAeC8GEsyQRzHKDe6RoPdbGhOYAOVwjW5m1AM2k4ige4f54kzCZ4m0kaooO26HA0SJvVOj0yXKHDhycN2jmqrnyFeVlOcopA+ZS48Wag1ybkLtSa48KTxLXyDjIEu/kcGPyegkLvEnxOcotC5rKYfdde+hWu0BwDcovWjg/DBhA8OSJ2J+34HTPgvsSJzQJpM/rMDqrvazfs46Wt8jaBIFKg60913Hr7RkLgDXMZzqmnX9GgAAAAASUVORK5CYII=" alt="">
+        <img class="mf-wb" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAaCAYAAAC+aNwHAAAA4ElEQVR42mNkQANScmr/GXCAZ49uMaKLMRGrGZc8E7GacaljwaXw2vo2nIYIGIdg9wIxmhkYGBg+nF3zH6cLfvz4waDkWYTXgHvb+/C7gBgAcwULPtPxAQHjEEYUF2CLY0KaMVwANeQ/MRphAKutF1a0oRhiEFGF03UoEkJicv+f3DnFoB3QgKHw45VtDO9ePcKdlIXE5P7z63jh9De/jheDkJjcf7x5gRyAYQA255NkAMUuwAUIBiLFLnj36hHjxyvbSLIda174/OrBIA3EwWsAC3JeYGBgYPj36hoDXQEAAvxONomU+cwAAAAASUVORK5CYII=" alt="">
+        <img class="mf-st" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAaCAYAAAC+aNwHAAAA6UlEQVR42mNkQANScmr/GXCAZ49uMaKLMRGrGZc8E7GacaljwaXw2vo2nIYIGIdg9wIxmhkYGBg+nF3zH6cLfvz4waDkWYTXgHvb+/C7gBgAcwULPtPxAQHjEEYUF2CLY0KaMVwANeQ/MRphAKutF1a0oRhiEFGF03UoEkJicv+f3DnFoB3QgKHw45VtDO9ePcKdlIXE5P7z63jh9De/jheDkJjcf7x5gRyAYQA255NkAMUuwAUIBiLFLnj36hHjxyvbSLIda174/OoBAwMDA8O/V9cYmMS0BlEgDl4DGJHzAiHFuGKCIgAAuchRMEPiRIkAAAAASUVORK5CYII=" alt="">
+        <img class="mf-of" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAaCAYAAAC+aNwHAAAA9klEQVR42mNkQANScmr/GXCAZ49uMaKLMRGrGZc8E7GacaljwaXw2vo2nIYIGIdg9wIxmhkYGBg+nF3zH6cLfvz4waDkWYTXgHvb+/C7gBgAcwULPtPxAQHjEEYUF2CLY0KaMVwANeQ/MRphAKutF1a0oRhiEFGF03UoEkJicv+f3DnFoB3QgKHw45VtDO9ePcKdlIXE5P7z63jh9De/jheDkJgchvdYSI0+ZEPevXrEiJEOsDkfPZqRo5pkF6CnUqINIBiI5AIm5AD5eGUbSbZj9cLnVw8YGBgYGP69usbAJKZFvAso9sLQNYARWxLFBXDFBEUAAHtSWln7fYlwAAAAAElFTkSuQmCC" alt="">
+      </div></div>
+      <img id="mfP0" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAQCAYAAAABOs/SAAAAxUlEQVR42mNkoABIyan9xyX37NEtRnx6mWhhKTHyTLSwlBh1LORYfG19G4aYVmAVSWYwkmrph7Nr8PoW3QG44prsOFbyLCI6NKhq8b3tfZRkCNItFjAOITp68GUpRnJd/OHsmv8Pbt+C8xVU1UhyGFkWC4nJ/efX8WK4uqGBQTugAauaj1e2Mbx79YiRakGNbCld4xgZ4PItMYCFGB9S21KCFguJyf1Hzja48i7VLX736hGjkmfRfwYaAIJBjZ4ycQU9qQAAjIBAx3l7yycAAAAASUVORK5CYII=" alt="">
+      <img id="mfP1" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAQCAYAAAABOs/SAAAAvUlEQVR42mNkoABIyan9xyX37NEtRnx6mWhhKTHyTLSwlBh1LORYfG19G4aYVmAVSWYwkmrph7Nr8PoW3QG44prsOFbyLCI6NKhq8b3tfZRkCNItFjAOITp68GUpRnJd/OHsmv8Pbt+C8xVU1UhyGFkWC4nJ/efX8WK4uqGBQTugAauaj1e2Mbx79YiRakGNbCklgEVITO4/uZpx+ZYoi9FTKK5sQk1L4RajW4YvbigJIRSL8VlCS8DEMEAAAFXAPoO9U08GAAAAAElFTkSuQmCC" alt="">
+      <img id="mfP2" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAQCAYAAAABOs/SAAAAu0lEQVR42mNkoABIyan9xyX37NEtRnx6mWhhKTHyTLSwlBh1LORYfG19G4aYVmAVSWYwkmrph7Nr8PoW3QG44prsOFbyLCI6NKhq8b3tfZRkCNItFjAOITp68GUpRnJd/OHsmv8Pbt+C8xVU1UhyGFkWC4nJ/efX8WK4uqGBQTugAauaj1e2Mbx79YiRakGNbCld4xgZ4PItTS2mxFIGBgYGFiExuf8MAwBY0PMkroKBJhajW4YvNVIrhAAcDTvG80KCeAAAAABJRU5ErkJggg==" alt="">
+      <img id="mfDoc" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAKCAYAAACE2W/HAAAAPUlEQVR42mMUEpP7z0AGYGFgYGB4cucUSZpkVMwgGmEcfADdcBZcEkQ5dXDZiMtAymy8euk0yfHISG4CAAAfARi9f9uMPAAAAABJRU5ErkJggg==" alt="">
+      <img id="mfStamp" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAYAAAAICAYAAADaxo44AAAAQ0lEQVR42mNggAIhMbn/QmJy/2F8JgYcgAmmGlknAwMDAyOyIDJgYWBgYNjew4ki6FnyHbcdLAwMDAzP235iSOC0AwBYMQ0VF4SSkAAAAABJRU5ErkJggg==" alt="">
+      <img id="mfMark" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAYAAABWdVznAAAAWElEQVR42mNkgIINGgr/GfCAgBsPGBkYGBiYiFGMrIYRWTHMFFyKGRgYGFiQFeOyCVmOBZdbcfmNBZ/12ABBGwhqwGYDsiEkhxIjsfEAM5CJGHcTqwYrAAC67TALCG4KtAAAAABJRU5ErkJggg==" alt="">
+      <div class="mf-bub" id="mfBubA"></div>
+      <div class="mf-bub" id="mfBubB"></div>
+      <div id="mfFlash"></div>
+    </div>
+  </div>
+  <div class="mf-word" id="mfWord">재무부 장관</div>
+  <div class="mf-skip" id="mfSkip">화면을 누르면 건너뜁니다</div>
+</div>
 
 <!-- 탭1 캘린더 -->
 <div class="page on" id="pg-cal">
@@ -2984,6 +3087,195 @@ $('pill-'+(amtMode==='round'?'round':'exact')).classList.add('on');
   UI.calY = now.getFullYear(); UI.calM = now.getMonth();
 }
 renderCal();
+</script>
+<script>
+(function(){
+  var el = document.getElementById('mfSplash');
+  if (!el) return;
+  var $ = function(id){ return document.getElementById(id); };
+  var min = $('mfMin'), body = $('mfMinBody'), bubA = $('mfBubA'), bubB = $('mfBubB');
+
+  /* 대사 세트 — ['m'|'p', 내용, 머무는 ms] / ['approve'] 결재 / ['leave'] 장관 퇴장 */
+  var SETS = [
+    [['m','각하, 이번달 지출이 상당합니다.<br><b>국가 재정 비상 사태</b>를 재가해주십쇼',2300],
+     ['p','다음달에 아껴쓸게…',1100],
+     ['approve']],
+
+    [['m','각하, 다음달 재정 예산안입니다.<br>결재 부탁드립니다.',2000],
+     ['p','음…. 재가하네',1000],
+     ['approve']],
+
+    [['m','흑흑….',800],
+     ['p','좌뇌…? 우뇌…?',1000],
+     ['m','흑흑…뇌….',900],
+     ['leave'],
+     ['p','…간뇌….',1200]],
+
+    [['m','각하, <b>비상금</b>에 손을 대셨습니다.',1400],
+     ['p','비상이었어.',900],
+     ['m','…무엇이 비상이었습니까.',1200],
+     ['p','치킨이…',1100],
+     ['sigh','어휴…',750],
+     ['leave']],
+
+    [['m','각하, 지출이 <b>지수적으로</b> 늘고 있습니다.',1700],
+     ['p','로그 스케일로 보면 완만해.',1300],
+     ['m','….',700],
+     ['leave']],
+
+    [['m','각하, 이번 달은 흑자입니다.',1400],
+     ['p','뭐? 진짜로?',900],
+     ['m','농담입니다.',1000],
+     ['leave']]
+  ];
+
+  /* 대사는 하루 첫 실행에만. 그 뒤엔 걸어와서 바로 결재(약 3.9초) */
+  var SHORT = [['approve']];
+  var seenToday = false, today = new Date().toISOString().slice(0, 10);
+  try {
+    seenToday = localStorage.getItem('mf_splash_day') === today;
+    localStorage.setItem('mf_splash_day', today);
+  } catch (e) {}
+  var full = window.MF_ALWAYS || !seenToday;
+  function pick(){ return full ? SETS[Math.floor(Math.random() * SETS.length)] : SHORT; }
+
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var WALK_IN = 1100, WALK_OUT = 950, SAY_GAP = 140, APPROVE = 1720, WORD = 750;
+
+  function span(plan){
+    var t = 320 + WALK_IN + WORD;
+    plan.forEach(function(s){
+      if (s[0] === 'm' || s[0] === 'p' || s[0] === 'sigh') t += s[2] + SAY_GAP;
+      else if (s[0] === 'approve') t += APPROVE;
+      else if (s[0] === 'leave') t += WALK_OUT;
+    });
+    return t;
+  }
+
+  var runId = 0;
+  function wait(ms){
+    var id = runId;
+    return new Promise(function(r){
+      setTimeout(function(){ if (id === runId) r(); }, reduce ? 0 : ms);
+    });
+  }
+  function op(id, v){ var e = $(id); if (e) e.style.opacity = v; }
+  function cls(id, name){ var e = $(id); if (e) e.classList.add(name); }
+  function pose(c){ min.className = c; }
+
+  function walkIn(){
+    pose('walk');
+    min.style.transition = 'transform ' + WALK_IN + 'ms linear';
+    min.style.transform = 'translateX(66px)';
+    return wait(WALK_IN).then(function(){ pose('stand'); });
+  }
+  /* 돌아서서 한마디 — 몸만 돌리고 아직 걷지 않는다 */
+  function sigh(html, ms){
+    body.style.transform = 'scaleX(-1)';
+    bubA.innerHTML = html;
+    bubA.classList.add('show');
+    return wait(ms).then(function(){
+      bubA.classList.remove('show');
+      return wait(SAY_GAP);
+    });
+  }
+  function walkOut(){
+    bubA.classList.remove('show');
+    body.style.transform = 'scaleX(-1)';
+    pose('walk');
+    min.style.transition = 'transform ' + WALK_OUT + 'ms linear';
+    min.style.transform = 'translateX(-32px)';
+    return wait(WALK_OUT).then(function(){ min.style.opacity = 0; });
+  }
+  function say(who, html, ms){
+    var b = who === 'm' ? bubA : bubB;
+    b.innerHTML = html;
+    b.classList.add('show');
+    return wait(ms).then(function(){
+      b.classList.remove('show');
+      return wait(SAY_GAP);
+    });
+  }
+  function approve(){
+    pose('offer');
+    return wait(160)
+      .then(function(){ op('mfDoc', 1); return wait(230); })
+      .then(function(){ cls('mfDoc', 'fly'); return wait(430); })
+      .then(function(){ op('mfP0', 0); op('mfP1', 1); op('mfStamp', 1); return wait(120); })
+      .then(function(){ cls('mfStamp', 'down'); return wait(240); })
+      .then(function(){
+        op('mfP1', 0); op('mfP2', 1);
+        cls('mfFlash', 'go');
+        cls('mfMark', 'pop');
+        return wait(320);
+      })
+      .then(function(){ cls('mfStamp', 'gone'); return wait(220); });
+  }
+
+  /* 새로고침 없이 처음 상태로 되돌린다 (미리보기 다시 재생용) */
+  function reset(){
+    runId++;
+    min.className = '';
+    min.style.transition = 'none';
+    min.style.transform = 'translateX(0)';
+    min.style.opacity = '';
+    body.style.transform = '';
+    bubA.classList.remove('show'); bubB.classList.remove('show');
+    ['mfDoc','mfStamp','mfMark','mfFlash'].forEach(function(id){
+      var e = $(id); e.className = ''; if (id !== 'mfFlash') e.style.opacity = 0;
+    });
+    op('mfP0', 1); op('mfP1', 0); op('mfP2', 0);
+    $('mfWord').classList.remove('show');
+    void min.offsetWidth;                 /* 리플로우 — 애니메이션 재시작용 */
+    min.style.transition = '';
+  }
+
+  function run(plan){
+    var chain = wait(320).then(walkIn);
+    plan.forEach(function(s){
+      chain = chain.then(function(){
+        if (s[0] === 'm' || s[0] === 'p') return say(s[0], s[1], s[2]);
+        if (s[0] === 'sigh') return sigh(s[1], s[2]);
+        if (s[0] === 'approve') return approve();
+        if (s[0] === 'leave') return walkOut();
+      });
+    });
+    chain.then(function(){ cls('mfWord', 'show'); });
+    return plan;
+  }
+
+  window.MF_REPLAY = function(){ reset(); return run(pick()); };
+
+  var plan = pick();
+  run(plan);
+
+  var MIN = reduce ? 1400 : span(plan) + 350, MAX = span(plan) + 4000, t0 = Date.now(), done = false;
+  function finish(){
+    if (done) return; done = true;
+    runId++;                             /* 남은 체인 중단 — 제거된 DOM을 만지지 않게 */
+    if (window.MF_KEEP) return;          /* 미리보기: 마지막 장면을 남겨둔다 */
+    el.classList.add('hide');
+    setTimeout(function(){
+      if (el.parentNode) el.parentNode.removeChild(el);
+      document.dispatchEvent(new Event('splash-done'));
+    }, 520);
+  }
+  el.addEventListener('click', function(){
+    if (window.MF_KEEP) { window.MF_REPLAY(); return; }   /* 미리보기에선 다시 재생 */
+    finish();
+  });
+  el.addEventListener('touchstart', function(){
+    if (window.MF_KEEP) { window.MF_REPLAY(); return; }
+    finish();
+  }, { passive: true });
+
+  setTimeout(function(){ cls('mfSkip', 'show'); }, 2200);
+
+  function ready(){ setTimeout(finish, Math.max(0, MIN - (Date.now() - t0))); }
+  if (document.readyState === 'complete') ready();
+  else window.addEventListener('load', ready);
+  setTimeout(finish, MAX);
+})();
 </script>
 </body>
 </html>
