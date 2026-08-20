@@ -580,6 +580,33 @@ body.theme-cream{
 }
 body.theme-cream .hdr h1{font-family:'Noto Serif KR',serif;font-weight:900;letter-spacing:0;}
 
+
+/* 윤곽·구분선 보강 (스타일 v2 뒤에 와서 이깁니다) */
+/* 가로 스크롤 여백 — 카드가 화면 끝에서 잘려 보이지 않게 */
+.sumstrip{margin-left:-18px;margin-right:-18px;padding-left:18px;padding-right:18px;
+  scroll-padding-left:18px;scroll-snap-type:x proximity;}
+.sumstrip::after{content:'';flex:0 0 6px;}
+/* 잘린 테두리가 뚝 끊겨 보이지 않게 오른쪽 끝을 흐린다 */
+.sumstrip{-webkit-mask-image:linear-gradient(90deg,#000 0 calc(100% - 22px),transparent 100%);
+  mask-image:linear-gradient(90deg,#000 0 calc(100% - 22px),transparent 100%);}
+.sumc{scroll-snap-align:start;}
+/* 캘린더 격자 구분선 */
+.cal{border:1.5px solid var(--ink);}
+.dowr{border-bottom:1.5px solid var(--ink);}
+.days{border-left:1px solid var(--line2);border-top:1px solid var(--line2);}
+.dc{margin:0;border-right:1px solid var(--line2);border-bottom:1px solid var(--line2);
+  border-radius:0;}
+/* 윤곽선이 없어 배경에 묻히던 것들 */
+.chat-foot{border-top:1.5px solid var(--ink);}
+.acc-r{border-bottom:1px solid var(--line2);}
+.goal-track{border:1px solid var(--line2);}
+.thumb{border:1.5px solid var(--ink);}
+.wz-prog .seg{border:1px solid var(--line2);}
+.srcb{border:1.5px solid var(--line2);}
+.del-btn{border:1.5px solid var(--ink);}
+.chat-row.a .bub{border-width:1.5px;}
+.mf-dio{border:0;}
+
 </style>
 <style>
 
