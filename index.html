@@ -3129,15 +3129,8 @@ renderCal();
      ['leave']]
   ];
 
-  /* 대사는 하루 첫 실행에만. 그 뒤엔 걸어와서 바로 결재(약 3.9초) */
-  var SHORT = [['approve']];
-  var seenToday = false, today = new Date().toISOString().slice(0, 10);
-  try {
-    seenToday = localStorage.getItem('mf_splash_day') === today;
-    localStorage.setItem('mf_splash_day', today);
-  } catch (e) {}
-  var full = window.MF_ALWAYS || !seenToday;
-  function pick(){ return full ? SETS[Math.floor(Math.random() * SETS.length)] : SHORT; }
+  /* 매번 랜덤 대사 — 길면 탭해서 건너뛰면 된다 */
+  function pick(){ return SETS[Math.floor(Math.random() * SETS.length)]; }
 
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var WALK_IN = 1100, WALK_OUT = 950, SAY_GAP = 140, APPROVE = 1720, WORD = 750;
@@ -3220,7 +3213,11 @@ renderCal();
     min.style.transform = 'translateX(0)';
     min.style.opacity = '';
     body.style.transform = '';
-    bubA.classList.remove('show'); bubB.classList.remove('show');
+    [bubA, bubB].forEach(function(b){
+      b.style.transition = 'none';
+      b.classList.remove('show');
+      b.innerHTML = '';
+    });
     ['mfDoc','mfStamp','mfMark','mfFlash'].forEach(function(id){
       var e = $(id); e.className = ''; if (id !== 'mfFlash') e.style.opacity = 0;
     });
@@ -3228,6 +3225,7 @@ renderCal();
     $('mfWord').classList.remove('show');
     void min.offsetWidth;                 /* 리플로우 — 애니메이션 재시작용 */
     min.style.transition = '';
+    bubA.style.transition = ''; bubB.style.transition = '';
   }
 
   function run(plan){
@@ -3244,7 +3242,14 @@ renderCal();
     return plan;
   }
 
-  window.MF_REPLAY = function(){ reset(); return run(pick()); };
+  /* 한 탭이 touchstart+click 둘 다 발화하므로 짧은 시간 안의 중복 호출은 무시 */
+  var lastGo = 0;
+  window.MF_REPLAY = function(){
+    var n = Date.now();
+    if (n - lastGo < 450) return;
+    lastGo = n;
+    reset(); return run(pick());
+  };
 
   var plan = pick();
   run(plan);
