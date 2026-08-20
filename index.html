@@ -434,6 +434,16 @@ table.simple tr:last-child td{border-bottom:none;}
 .ws-bub.bd{left:4px;top:4px;max-width:92px;}
 .ws-bub.bd::before{left:14px}.ws-bub.bd::after{left:15px}
 
+/* 연출 시험실 */
+.lab-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;}
+.lab-grid.g3{grid-template-columns:repeat(3,1fr);}
+.lab-grid.g2{grid-template-columns:repeat(2,1fr);}
+.lab-dex{display:flex;flex-wrap:wrap;gap:14px 12px;background:var(--paper);border-radius:14px;
+  padding:16px 14px;box-shadow:var(--shadow);justify-content:center;align-items:flex-end;}
+.lab-dex .it{text-align:center;}
+.lab-dex img{image-rendering:pixelated;display:block;margin:0 auto 5px;}
+.lab-dex .n{font-size:9.5px;color:var(--ink3);font-weight:600;}
+
 /* 정산 마법사 */
 #ov-wizard{z-index:57;}
 .wz-prog{display:flex;gap:5px;margin-bottom:20px;}
@@ -734,6 +744,36 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
   <div id="decBody"></div>
 </div>
 
+<!-- 오버레이: 연출 시험실 -->
+<div class="ovpage" id="ov-lab">
+  <div class="ov-hdr">
+    <button class="back-btn" onclick="closeLab()">‹</button>
+    <div><div class="t">연출 시험실</div><div class="s">앱의 픽셀 연출을 한곳에서 재생</div></div>
+  </div>
+  <div class="sec-title">스플래시 대사 <span class="s">전체 화면 재생 · 탭하면 닫힘</span></div>
+  <div class="lab-grid" id="labSplashBtns"></div>
+  <div class="sec-title">정산 로딩 씬 <span class="s">API가 도는 동안 반복되는 장면</span></div>
+  <div class="lab-grid g3">
+    <button class="btn sm ghost" onclick="labScene('muster')">소집 씬</button>
+    <button class="btn sm ghost" onclick="labScene('write')">집필 씬</button>
+    <button class="btn sm ghost" onclick="labSceneStop()">정지</button>
+  </div>
+  <div id="labSceneBody" style="margin-top:10px"></div>
+  <div class="sec-title">결재 연출</div>
+  <div class="lab-grid g2">
+    <button class="btn sm ghost" onclick="playDiorama('labDioBox')">완료 디오라마</button>
+    <button class="btn sm ghost" onclick="stampFX($('labStampCard'))">재가 도장</button>
+  </div>
+  <div style="display:flex;justify-content:center;margin-top:12px"><div class="mf-dio" id="labDioBox"></div></div>
+  <div class="card" id="labStampCard" style="margin-top:10px">
+    <div style="font-size:11px;font-weight:800;color:var(--blue);letter-spacing:1px;margin-bottom:4px">기록 제안</div>
+    <div style="font-size:13px;line-height:1.6">여기에 도장이 찍힙니다 — [재가 도장]을 눌러보세요</div>
+  </div>
+  <div class="sec-title">스프라이트 도감</div>
+  <div id="labDex"></div>
+  <div style="height:30px"></div>
+</div>
+
 <!-- 오버레이: 정산 마법사 -->
 <div class="ovpage" id="ov-wizard">
   <div class="ov-hdr">
@@ -872,6 +912,11 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
     <button class="btn ghost" style="margin-bottom:8px" onclick="exportCSV()">자산 CSV 내보내기</button>
     <button class="btn ghost" style="color:var(--up)" onclick="confirmClear()">전체 삭제</button>
     <div id="demoRow"></div>
+  </div>
+
+  <div class="set-sec">
+    <div class="card-lbl">그 외</div>
+    <button class="btn ghost" onclick="openLab()">연출 시험실 — 애니메이션 모아보기</button>
   </div>
 </div>
 
@@ -1144,8 +1189,8 @@ function stampFX(target){
   setTimeout(()=>{ if(d.parentNode) d.parentNode.removeChild(d); }, 1400);
 }
 /* 정산 완료 화면 — 문서 전달→도장 미니 디오라마 (표시될 때마다 처음부터 재생) */
-function playDiorama(){
-  const el = $('wzDio');
+function playDiorama(id){
+  const el = $(id || 'wzDio');
   if(!el) return;
   el.innerHTML = '';
   void el.offsetWidth;
@@ -1341,6 +1386,60 @@ async function wzBriefRun(memoStr){
       if(!await wzWait(900)) return;
     }
   }
+}
+
+/*
+   연출 시험실 — 실제 연출 함수를 그대로 호출한다 (시험실에서 되면 실전에서도 된다)
+*/
+function openLab(){ closeAllSheets(); renderLab(); openOv('ov-lab'); }
+function closeLab(){ labSceneStop(); closeOv('ov-lab'); }
+function labSceneStop(){ wzSceneStop(); const b = $('labSceneBody'); if(b) b.innerHTML = ''; }
+function labScene(kind){
+  if(kind === 'write'){
+    if(!WZ.ym) WZ.ym = ymNow();
+    wzBriefScene('labSceneBody', '집필 씬 미리보기 — 노크는 세 번째 이벤트마다 나와요.',
+      '이번달 특이지출 메모 예시, 만기 적금 이체 예시');
+  }else{
+    wzSceneStart('labSceneBody', '소집 씬 미리보기 — 1막 소집 후 2막 작업 루프가 계속 돌아요.');
+  }
+}
+function labSplash(n){
+  const el = window.__mfSplash;
+  if(!el || typeof window.MF_REPLAY !== 'function'){
+    toast('스플래시 노드가 없어요 — 앱을 새로고침한 뒤 다시 열어주세요');
+    return;
+  }
+  if(!el.__labBound){
+    el.__labBound = true;
+    el.addEventListener('click', function(){
+      el.classList.add('hide');
+      setTimeout(function(){ if(el.parentNode) el.parentNode.removeChild(el); }, 520);
+    });
+  }
+  document.body.appendChild(el);
+  void el.offsetWidth;
+  el.classList.remove('hide');
+  const _r = Math.random;
+  if(n >= 0) Math.random = function(){ return (n + 0.5) / 6; };
+  try{ window.MF_REPLAY(); } finally { Math.random = _r; }
+}
+function renderLab(){
+  const names = ['재정 비상', '예산안', '간뇌', '치킨', '로그', '흑자'];
+  $('labSplashBtns').innerHTML = names.map((n, i)=>
+    `<button class="btn sm ghost" onclick="labSplash(${i})">${esc(n)}</button>`).join('')
+    + `<button class="btn sm ghost" onclick="labSplash(-1)">랜덤</button>`;
+  const DEX = [
+    ['min_stand', '장관', 2], ['min_offer', '결재 요청', 2], ['min_sit0', '집필', 3],
+    ['pres0', '대통령', 2], ['pres2', '결재', 2],
+    ['staff_a0', '직원 A', 3], ['staff_b0', '직원 B', 3], ['staff_c0', '직원 C', 3],
+    ['doc', '문서', 3], ['stamp', '도장', 3], ['mark', '결재인', 3],
+  ];
+  const SIZE = { min_stand:[16,26], min_offer:[16,26], min_sit0:[16,15], pres0:[30,16], pres2:[30,16],
+    staff_a0:[12,18], staff_b0:[12,18], staff_c0:[12,18], doc:[14,10], stamp:[6,8], mark:[12,12] };
+  $('labDex').innerHTML = `<div class="lab-dex">${DEX.map(([k, n, z])=>{
+    const [w, h] = SIZE[k];
+    return `<div class="it"><img src="${MF_PIX[k]}" style="width:${w*z}px;height:${h*z}px" alt=""><div class="n">${esc(n)}</div></div>`;
+  }).join('')}</div>`;
 }
 
 /*
@@ -3594,6 +3693,7 @@ renderCal();
     el.classList.add('hide');
     setTimeout(function(){
       if (el.parentNode) el.parentNode.removeChild(el);
+      window.__mfSplash = el;
       document.dispatchEvent(new Event('splash-done'));
     }, 520);
   }
