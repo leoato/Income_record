@@ -515,6 +515,69 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
   input, textarea, select, .inp, textarea.inp, .ext-r input{ font-size:max(16px,1em) !important; }
   body{ -webkit-text-size-adjust:100%; }
 }
+
+/* 스타일 v2 — 머스터드 브리핑룸 (도안 5 원안)
+   구조는 토스 레이아웃 그대로, 재질만 교체: 먹선 + 오프셋 그림자 + 머스터드 액센트.
+   차트 팔레트(--c-*)와 관보(#ov-brief)는 검증된 그대로 두고 건드리지 않는다. */
+:root{
+  --acc:#E5B94E; --acc-deep:#C99B2E; --acc-bg:#F6E9C8;
+  --ink:#14181F;
+  --sur:#FAF6EC; --sur2:#F1E9D6; --paper:#FFFFFF;
+  --line:#EDE5D0; --line2:#DCD2B9;
+  --blue:#C99B2E; --blue-bg:#F6E9C8;
+  --shadow:2px 2px 0 rgba(20,24,31,.85);
+}
+html{background:#EFE8D8;}
+.card,.cta-card,.sumc,.cal,.acc-tbl,.dec-r,.dec-sum span,.key-ok,.fulltext{border:1.5px solid var(--ink);}
+.cta-card{border-width:2px;box-shadow:3px 3px 0 var(--ink);}
+.hdr h1{display:flex;align-items:center;gap:9px;}
+.hdr h1::before{content:'';width:9px;height:20px;flex:none;background:var(--acc);
+  border:1.5px solid var(--ink);box-shadow:2px 2px 0 var(--ink);}
+.btn{background:var(--acc);color:var(--ink);border:1.5px solid var(--ink);box-shadow:2px 2px 0 var(--ink);}
+.btn:active{transform:translate(2px,2px);box-shadow:0 0 0 var(--ink);opacity:1;}
+.btn.ghost{background:var(--paper);color:var(--ink);}
+.btn:disabled{background:var(--sur2);color:var(--ink4);border-color:var(--line2);box-shadow:none;}
+.icon-btn,.back-btn,.ov-menu{background:var(--paper);border:1.5px solid var(--ink);
+  box-shadow:1.5px 1.5px 0 var(--ink);color:var(--ink);}
+.icon-btn:active,.back-btn:active{transform:translate(1.5px,1.5px);box-shadow:0 0 0 var(--ink);}
+.badge.dark{background:var(--ink);color:var(--acc);}
+.tabbar{border-top:2px solid var(--ink);}
+.tab.on{color:var(--ink);}
+.tab.on svg{background:var(--acc);border:1.5px solid var(--ink);border-radius:8px;
+  box-shadow:1.5px 1.5px 0 var(--ink);width:29px;height:29px;padding:3.5px;}
+.dc.today .n{background:var(--ink);color:var(--acc);}
+.spinner{border-top-color:var(--ink);}
+.goal-fill{background:var(--acc-deep);}
+.inp{border-color:var(--line2);background:var(--paper);}
+.inp:focus{border-color:var(--acc-deep);}
+.sheet{border:2px solid var(--ink);border-bottom:none;}
+.chat-send{background:var(--acc);color:var(--ink);border:1.5px solid var(--ink);}
+.chat-send:disabled{background:var(--sur2);color:var(--ink4);border-color:var(--line2);}
+.chat-row.u .bub{background:var(--acc);color:var(--ink);border:1px solid var(--ink);border-bottom-right-radius:5px;}
+.chat-row.a .bub{border-color:var(--ink);}
+.chat-in{border-color:var(--line2);}
+.chat-in:focus{border-color:var(--acc-deep);}
+.prop{border-color:var(--ink);}
+.prop .pk{color:var(--acc-deep);}
+.prop .ok{background:var(--acc);color:var(--ink);border:1.5px solid var(--ink);}
+.prop .no{border:1.5px solid var(--line2);}
+.prop.done{border-color:var(--good);}
+.dec-r{border-left-width:3px;}
+.sumc.total{background:var(--acc-bg);}
+.sumc.total .l{color:var(--acc-deep);}
+.srcb.sel{background:var(--acc-bg);border-color:var(--ink);}
+.cta-d b, .lock-t{color:var(--ink);}
+.wz-scene{border:1.5px solid var(--ink);}
+.lab-dex{border:1.5px solid var(--ink);}
+
+/* 테마: 크림 종이 (도안 5B) — 표면만 낡은 종이로, 문법은 동일 */
+body.theme-cream{
+  --sur:#F6EFDF; --sur2:#EDE4C9; --paper:#FBF6E8;
+  --line:#E8DEC5; --line2:#D9CDAA; --acc-bg:#F2E4BE; --blue-bg:#F2E4BE;
+  background-image:repeating-linear-gradient(0deg, rgba(120,100,60,.05) 0 1px, transparent 1px 4px);
+}
+body.theme-cream .hdr h1{font-family:'Noto Serif KR',serif;font-weight:900;letter-spacing:0;}
+
 </style>
 <style>
 
@@ -916,6 +979,7 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
 
   <div class="set-sec">
     <div class="card-lbl">그 외</div>
+    <button class="btn ghost" id="themeBtn" style="margin-bottom:8px" onclick="toggleTheme()">테마</button>
     <button class="btn ghost" onclick="openLab()">연출 시험실 — 애니메이션 모아보기</button>
   </div>
 </div>
@@ -1391,6 +1455,18 @@ async function wzBriefRun(memoStr){
 /*
    연출 시험실 — 실제 연출 함수를 그대로 호출한다 (시험실에서 되면 실전에서도 된다)
 */
+function themeLabel(){
+  return LS.get('mf_theme') === 'cream'
+    ? '테마: 크림 종이 → 머스터드로 전환'
+    : '테마: 머스터드 → 크림 종이로 전환';
+}
+function toggleTheme(){
+  const cream = LS.get('mf_theme') !== 'cream';
+  LS.set('mf_theme', cream ? 'cream' : 'base');
+  document.body.classList.toggle('theme-cream', cream);
+  const b = $('themeBtn'); if(b) b.textContent = themeLabel();
+  toast(cream ? '크림 종이 테마' : '머스터드 테마');
+}
 function openLab(){ closeAllSheets(); renderLab(); openOv('ov-lab'); }
 function closeLab(){ labSceneStop(); closeOv('ov-lab'); }
 function labSceneStop(){ wzSceneStop(); const b = $('labSceneBody'); if(b) b.innerHTML = ''; }
@@ -3339,7 +3415,7 @@ function finishWizard(){
 /*
    설정
 */
-function openSettings(){ renderKeyArea(); renderSrcList(); renderDemoRow(); openSheet('sh-set'); }
+function openSettings(){ renderKeyArea(); renderSrcList(); renderDemoRow(); const tb=$('themeBtn'); if(tb) tb.textContent=themeLabel(); openSheet('sh-set'); }
 function renderDemoRow(){
   const el = $('demoRow'); if(!el) return;
   el.innerHTML = isDemo()
@@ -3517,6 +3593,7 @@ $('pill-'+(amtMode==='round'?'round':'exact')).classList.add('on');
   const now = new Date();
   UI.calY = now.getFullYear(); UI.calM = now.getMonth();
 }
+if(LS.get('mf_theme')==='cream') document.body.classList.add('theme-cream');
 renderCal();
 </script>
 <script>
