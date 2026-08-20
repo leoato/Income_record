@@ -631,6 +631,13 @@ body.theme-cream .hdr h1{font-family:'Noto Serif KR',serif;font-weight:900;lette
   border-right:5px solid transparent;border-top:7px solid #14181f;}
 #mfSplash .mf-bub::after{bottom:-5px;border-left:4px solid transparent;
   border-right:4px solid transparent;border-top:5px solid #F5EFE0;}
+#mfGraph{position:absolute;left:8px;top:60px;opacity:0;
+  transition:opacity .25s ease;shape-rendering:crispEdges;}
+#mfGraph.on{opacity:1;}
+#mfGraph .gbox{fill:#F5EFE0;stroke:#14181f;stroke-width:1.2;}
+#mfGraph .gline{fill:none;stroke:#9a2b22;stroke-width:1.6;stroke-linecap:square;
+  stroke-dasharray:100;stroke-dashoffset:100;}
+#mfGraph.draw .gline{transition:stroke-dashoffset .95s cubic-bezier(.4,0,.5,1);stroke-dashoffset:0;}
 #mfBubA{left:6px;top:38px;width:104px;}
 #mfBubA::before{left:64px}#mfBubA::after{left:65px}
 #mfBubB{left:96px;top:44px;width:78px;}
@@ -678,6 +685,10 @@ body.theme-cream .hdr h1{font-family:'Noto Serif KR',serif;font-weight:900;lette
       <img id="mfDoc" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAKCAYAAACE2W/HAAAAPUlEQVR42mMUEpP7z0AGYGFgYGB4cucUSZpkVMwgGmEcfADdcBZcEkQ5dXDZiMtAymy8euk0yfHISG4CAAAfARi9f9uMPAAAAABJRU5ErkJggg==" alt="">
       <img id="mfStamp" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAYAAAAICAYAAADaxo44AAAAQ0lEQVR42mNggAIhMbn/QmJy/2F8JgYcgAmmGlknAwMDAyOyIDJgYWBgYNjew4ki6FnyHbcdLAwMDAzP235iSOC0AwBYMQ0VF4SSkAAAAABJRU5ErkJggg==" alt="">
       <img id="mfMark" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAYAAABWdVznAAAAWElEQVR42mNkgIINGgr/GfCAgBsPGBkYGBiYiFGMrIYRWTHMFFyKGRgYGFiQFeOyCVmOBZdbcfmNBZ/12ABBGwhqwGYDsiEkhxIjsfEAM5CJGHcTqwYrAAC67TALCG4KtAAAAABJRU5ErkJggg==" alt="">
+      <svg id="mfGraph" viewBox="0 0 46 26" width="46" height="26" aria-hidden="true">
+        <rect class="gbox" x="1" y="1" width="44" height="24"></rect>
+        <path class="gline" pathLength="100" d=""></path>
+      </svg>
       <div class="mf-bub" id="mfBubA"></div>
       <div class="mf-bub" id="mfBubB"></div>
       <div id="mfFlash"></div>
@@ -3668,8 +3679,8 @@ renderCal();
      ['sigh','어휴…',750],
      ['leave']],
 
-    [['m','각하, 지출이 <b>지수적으로</b> 늘고 있습니다.',1700],
-     ['p','로그 스케일로 보면 완만해.',1300],
+    [['m','각하, 지출이 <b>지수적으로</b> 늘고 있습니다.',1900,'exp'],
+     ['p','로그 스케일로 보면 완만해.',1500,'log'],
      ['m','….',700],
      ['leave']],
 
@@ -3730,10 +3741,50 @@ renderCal();
     min.style.transform = 'translateX(-32px)';
     return wait(WALK_OUT).then(function(){ min.style.opacity = 0; });
   }
-  function say(who, html, ms){
+  /* 지수 → 로그 그래프. 두 곡선을 같은 점 개수로 만들어 사이를 섞는다 */
+  var gEl = $('mfGraph'), gLine = gEl && gEl.querySelector('.gline'), gRaf = 0;
+  function gPath(t){
+    var N = 26, x0 = 5, x1 = 41, yLo = 21, yHi = 5, kE = 2.9, kL = 14, d = '';
+    for (var i = 0; i < N; i++){
+      var u = i / (N - 1);
+      var ve = (Math.exp(kE * u) - 1) / (Math.exp(kE) - 1);
+      var vl = Math.log(1 + kL * u) / Math.log(1 + kL);
+      var v = ve * (1 - t) + vl * t;
+      d += (i ? 'L' : 'M') + (x0 + (x1 - x0) * u).toFixed(2) + ' ' + (yLo + (yHi - yLo) * v).toFixed(2);
+    }
+    return d;
+  }
+  function graph(kind){
+    if (!gEl || !gLine) return;
+    cancelAnimationFrame(gRaf);
+    if (kind === 'exp'){
+      gLine.setAttribute('d', gPath(0));
+      gEl.classList.remove('draw');
+      gEl.classList.add('on');
+      void gEl.offsetWidth;                 /* 리플로우 — 선 그리기 재시작 */
+      if (reduce) { gEl.classList.add('draw'); return; }
+      setTimeout(function(){ gEl.classList.add('draw'); }, 260);
+      return;
+    }
+    if (kind === 'log'){
+      if (reduce) { gLine.setAttribute('d', gPath(1)); return; }
+      var t0 = 0, id = runId;
+      var step = function(ts){
+        if (id !== runId) return;
+        if (!t0) t0 = ts;
+        var k = Math.min(1, (ts - t0) / 800);
+        var e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;   /* easeInOutQuad */
+        gLine.setAttribute('d', gPath(e));
+        if (k < 1) gRaf = requestAnimationFrame(step);
+      };
+      gRaf = requestAnimationFrame(step);
+    }
+  }
+  function say(who, html, ms, g){
     var b = who === 'm' ? bubA : bubB;
     b.innerHTML = html;
     b.classList.add('show');
+    if (g) graph(g);
     return wait(ms).then(function(){
       b.classList.remove('show');
       return wait(SAY_GAP);
@@ -3769,10 +3820,14 @@ renderCal();
       b.innerHTML = '';
     });
     ['mfDoc','mfStamp','mfMark','mfFlash'].forEach(function(id){
-      var e = $(id); e.className = ''; if (id !== 'mfFlash') e.style.opacity = 0;
+      var e = $(id); if (!e) return;
+      e.className = ''; if (id !== 'mfFlash') e.style.opacity = 0;
     });
     op('mfP0', 1); op('mfP1', 0); op('mfP2', 0);
-    $('mfWord').classList.remove('show');
+    cancelAnimationFrame(gRaf);
+    if (gEl){ gEl.classList.remove('on'); gEl.classList.remove('draw'); }
+    if (gLine) gLine.setAttribute('d', '');
+    var w = $('mfWord'); if (w) w.classList.remove('show');
     void min.offsetWidth;                 /* 리플로우 — 애니메이션 재시작용 */
     min.style.transition = '';
     bubA.style.transition = ''; bubB.style.transition = '';
@@ -3782,7 +3837,7 @@ renderCal();
     var chain = wait(320).then(walkIn);
     plan.forEach(function(s){
       chain = chain.then(function(){
-        if (s[0] === 'm' || s[0] === 'p') return say(s[0], s[1], s[2]);
+        if (s[0] === 'm' || s[0] === 'p') return say(s[0], s[1], s[2], s[3]);
         if (s[0] === 'sigh') return sigh(s[1], s[2]);
         if (s[0] === 'approve') return approve();
         if (s[0] === 'leave') return walkOut();
