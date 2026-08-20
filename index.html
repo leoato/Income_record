@@ -435,6 +435,11 @@ table.simple tr:last-child td{border-bottom:none;}
 .ws-bub.bd::before{left:14px}.ws-bub.bd::after{left:15px}
 .ws-bub.bs{right:4px;top:26px;max-width:86px;}
 .ws-bub.bs::before{right:20px}.ws-bub.bs::after{right:21px}
+/* 소집 씬 — 장관은 왼쪽 끝(x≈14), 직원은 그 옆(x≈32)에 선다 */
+.ws-bub.bm2{left:2px;top:2px;max-width:96px;}
+.ws-bub.bm2::before{left:9px}.ws-bub.bm2::after{left:10px}
+.ws-bub.bs2{left:20px;top:26px;max-width:94px;}
+.ws-bub.bs2::before{left:9px}.ws-bub.bs2::after{left:10px}
 
 /* 연출 시험실 */
 .lab-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;}
@@ -724,8 +729,8 @@ body.theme-cream .hdr h1{font-family:'Noto Serif KR',serif;font-weight:900;lette
         <rect class="gbox" x="1" y="1" width="44" height="24"></rect>
         <path class="gline" pathLength="100" d=""></path>
         <g class="glabel">
-          <rect x="5" y="15.5" width="15" height="7" rx="1"></rect>
-          <text x="12.5" y="20.6">위험!</text>
+          <rect x="26" y="15.5" width="15" height="7" rx="1"></rect>
+          <text x="33.5" y="20.6">위험!</text>
         </g>
       </svg>
       <div class="mf-bub" id="mfBubA"></div>
@@ -738,7 +743,7 @@ body.theme-cream .hdr h1{font-family:'Noto Serif KR',serif;font-weight:900;lette
 </div>
 
 <!-- 탭1 캘린더 -->
-<div class="page on" id="pg-cal">
+<div class="page" id="pg-cal">
   <div class="hdr">
     <div><h1>수입 캘린더</h1><div class="sub">Income Log</div></div>
     <div class="hdr-right">
@@ -774,7 +779,7 @@ body.theme-cream .hdr h1{font-family:'Noto Serif KR',serif;font-weight:900;lette
 </div>
 
 <!-- 탭3 자산 -->
-<div class="page" id="pg-asset">
+<div class="page on" id="pg-asset">
   <div class="hdr"><div><h1>자산</h1><div class="sub">월말 스냅샷 · 순자산 추이</div></div></div>
   <div id="assetBody"></div>
 </div>
@@ -796,11 +801,11 @@ body.theme-cream .hdr h1{font-family:'Noto Serif KR',serif;font-weight:900;lette
 
 <!-- 탭바 -->
 <nav class="tabbar">
-  <button class="tab on" id="tab-cal" onclick="go('cal')"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>캘린더</button>
-  <button class="tab" id="tab-an" onclick="go('an')"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M21 20H3"/></svg>분석</button>
-  <button class="tab" id="tab-asset" onclick="go('asset')"><svg viewBox="0 0 24 24"><path d="M3 10l9-6 9 6M5 10v9M12 10v9M19 10v9M3 20h18"/></svg>자산</button>
-  <button class="tab" id="tab-acct" onclick="go('acct')"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18M7 15h4"/></svg>계좌</button>
+  <button class="tab on" id="tab-asset" onclick="go('asset')"><svg viewBox="0 0 24 24"><path d="M3 10l9-6 9 6M5 10v9M12 10v9M19 10v9M3 20h18"/></svg>자산</button>
   <button class="tab" id="tab-min" onclick="go('min')"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M6 21v-1a6 6 0 0 1 12 0v1"/></svg>장관</button>
+  <button class="tab" id="tab-cal" onclick="go('cal')"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>캘린더</button>
+  <button class="tab" id="tab-an" onclick="go('an')"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M21 20H3"/></svg>분석</button>
+  <button class="tab" id="tab-acct" onclick="go('acct')"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18M7 15h4"/></svg>계좌</button>
 </nav>
 
 <!-- 오버레이: 자산 월 상세 -->
@@ -1352,8 +1357,8 @@ function wzSceneStart(bodyId, note){
       <img class="ws-stackdoc pix" data-ws="d0" src="${MF_PIX.doc}" style="left:26px;bottom:15px" alt="">
       <img class="ws-stackdoc pix" data-ws="d1" src="${MF_PIX.doc}" style="left:27px;bottom:18px" alt="">
       <img class="ws-stackdoc pix" data-ws="d2" src="${MF_PIX.doc}" style="left:28px;bottom:21px" alt="">
-      <div class="ws-bub bm" data-ws="bubM"></div>
-      <div class="ws-bub bs" data-ws="bubS"></div>
+      <div class="ws-bub bm2" data-ws="bubM"></div>
+      <div class="ws-bub bs2" data-ws="bubS"></div>
     </div></div>
     <div class="ws-fallback"><div class="spinner"></div></div>
     <div class="spin-note">${note}</div>`;
@@ -2289,7 +2294,7 @@ async function callBatchBrief(){
 const UI = { tab:'cal', calY:0, calM:0, anRange:0, incDate:null, incSrc:null };
 function go(tab){
   UI.tab = tab;
-  ['cal','an','asset','acct','min'].forEach(k=>{
+  ['asset','min','cal','an','acct'].forEach(k=>{
     $('pg-'+k).classList.toggle('on',k===tab);
     $('tab-'+k).classList.toggle('on',k===tab);
   });
@@ -3686,7 +3691,8 @@ $('pill-'+(amtMode==='round'?'round':'exact')).classList.add('on');
   UI.calY = now.getFullYear(); UI.calM = now.getMonth();
 }
 if(LS.get('mf_theme')==='cream') document.body.classList.add('theme-cream');
-renderCal();
+UI.tab = 'asset';
+renderCal(); renderAsset();
 </script>
 <script>
 (function(){
