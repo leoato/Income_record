@@ -433,6 +433,8 @@ table.simple tr:last-child td{border-bottom:none;}
 .ws-bub.bm::before{right:32px}.ws-bub.bm::after{right:33px}
 .ws-bub.bd{left:4px;top:4px;max-width:92px;}
 .ws-bub.bd::before{left:14px}.ws-bub.bd::after{left:15px}
+.ws-bub.bs{right:4px;top:26px;max-width:86px;}
+.ws-bub.bs::before{right:20px}.ws-bub.bs::after{right:21px}
 
 /* 연출 시험실 */
 .lab-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;}
@@ -1273,10 +1275,16 @@ function wzSceneStop(){
   WZS.timers = [];
   WZS.root = null;
 }
+/* 항상 resolve한다 — 중단됐으면 false. 예전엔 영영 pending으로 두어
+   한 번 어긋나면 체인이 조용히 죽고 화면이 멈춘 채 남았다. */
 function wzWait(ms){
   const id = WZS.run;
   return new Promise(res=>{
-    const t = setTimeout(()=>{ if(id === WZS.run) res(true); }, ms);
+    const t = setTimeout(()=>{
+      const i = WZS.timers.indexOf(t);
+      if(i >= 0) WZS.timers.splice(i, 1);
+      res(id === WZS.run);
+    }, ms);
     WZS.timers.push(t);
   });
 }
@@ -1294,6 +1302,8 @@ function wzSceneStart(bodyId, note){
       <img class="ws-stackdoc pix" data-ws="d0" src="${MF_PIX.doc}" style="left:26px;bottom:15px" alt="">
       <img class="ws-stackdoc pix" data-ws="d1" src="${MF_PIX.doc}" style="left:27px;bottom:18px" alt="">
       <img class="ws-stackdoc pix" data-ws="d2" src="${MF_PIX.doc}" style="left:28px;bottom:21px" alt="">
+      <div class="ws-bub bm" data-ws="bubM"></div>
+      <div class="ws-bub bs" data-ws="bubS"></div>
     </div></div>
     <div class="ws-fallback"><div class="spinner"></div></div>
     <div class="spin-note">${note}</div>`;
@@ -1319,11 +1329,30 @@ function wzMinPose(pose){
   const m = WZS.root && WZS.root.querySelector('[data-ws="min"]');
   if(m) m.src = pose === 'offer' ? MF_PIX.min_offer : MF_PIX.min_stand;
 }
+/* 씬 공용 — 말풍선 한 줄. 중단되면 false를 돌려 체인을 끊는다 */
+async function wsSay(which, html, ms){
+  const root = WZS.root;
+  if(!root) return false;
+  const b = root.querySelector('[data-ws="' + which + '"]');
+  if(!b) return false;
+  b.innerHTML = html;
+  b.classList.add('show');
+  if(!await wzWait(ms)) return false;
+  b.classList.remove('show');
+  return wzWait(160);
+}
 async function wzSceneRun(){
   const root = WZS.root;
   if(!root) return;
   const DESKX = [62, 98, 134];
   const staff = [];
+  const ORDERS = [
+    ['전 부서 소집. 캡처 판독을 시작한다.', '넵!'],
+    ['자네는 계좌별 잔액을 뽑게.', '알겠습니다!'],
+    ['자네는 합계를 검산하도록.', '맡겨주십쇼!'],
+  ];
+  if(!await wzWait(400)) return;
+  if(!await wsSay('bubM', ORDERS[0][0], 1500)) return;
   /* 1막 — 소집: 직원들이 하나씩 달려와 자료를 받고 자리로 간다 */
   for(let i = 0; i < 3; i++){
     if(!wzAlive() || WZS.root !== root) return;
@@ -1341,6 +1370,10 @@ async function wzSceneRun(){
     }
     if(!await wzWait(420)) return;
     if(stackDoc) stackDoc.remove();
+    if(i > 0){
+      if(!await wsSay('bubM', ORDERS[i][0], 1300)) return;
+    }
+    if(!await wsSay('bubS', ORDERS[i][1], 900)) return;
     wzMinPose('stand');
     wzFace(c, 1);
     if(!await wzMove(c, DESKX[i] - 9, 1250)) return;
@@ -1368,7 +1401,14 @@ async function wzSceneRun(){
       wzFace(c, -1);
       if(!await wzMove(c, 26, 950)) return;
       wzMinPose('offer');
-      if(!await wzWait(500)) return;
+      const REPORT = [
+        ['장관님, 1차 판독 끝냈습니다.', '수고했네. 계속.'],
+        ['잔액이 하나 안 맞습니다.', '다시 세어보게.'],
+        ['합계 검산 완료했습니다.', '좋아.'],
+        ['캡처가 흐린 게 있습니다.', '읽히는 데까지만.'],
+      ][Math.floor(Math.random() * 4)];
+      if(!await wsSay('bubS', REPORT[0], 1400)) return;
+      if(!await wsSay('bubM', REPORT[1], 1000)) return;
       wzMinPose('stand');
       wzFace(c, 1);
       if(!await wzMove(c, DESKX[k] - 9, 950)) return;
@@ -1377,7 +1417,9 @@ async function wzSceneRun(){
       /* 순찰: 장관이 잠깐 돌아본다 */
       const m = root.querySelector('[data-ws="min"]');
       if(m) m.style.transform = 'scaleX(-1)';
-      if(!await wzWait(800)) return;
+      if(!await wzWait(500)) return;
+      const PATROL = ['진행 상황은.', '서두르게.', '정확이 우선이다.', '…음.'];
+      if(!await wsSay('bubM', PATROL[Math.floor(Math.random() * 4)], 1100)) return;
       if(m) m.style.transform = '';
     }
     /* ev 2: 아무 일 없음 — 책상 서류 깜빡임(CSS)만 계속 */
