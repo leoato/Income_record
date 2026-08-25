@@ -2122,6 +2122,14 @@ const EXTRACT_SCHEMA = {
     }},
   },
 };
+/* KPI 세 번째 항목은 이 사람이 뭘 하는 사람이냐에 달렸다 — 빚 갚는 사람에게 '1억 진행률'은 뜻이 없다 */
+function kpiSpec(withDebt, spanLabel){
+  const first = spanLabel || '전월 대비 증감(원, +/-표기)';
+  return withDebt
+    ? `kpis는 정확히 3개: ① ${first} ② 비상금 충족률(%) ③ 부채 상환 진행률(%)`
+    : `kpis는 정확히 3개: ① ${first} ② 비상금 충족률(%) ③ 1억 진행률(%)`;
+}
+function anyDebtNow(){ return hasAnyDebt(allAssetYms().map(getAsset)); }
 function extractSystem(){
   return `너는 개인 재무 앱의 계좌 판독기다. 토스(Toss) 자산 화면 캡처들을 읽고 계좌별 잔액을 추출한다.
 규칙:
@@ -2145,7 +2153,7 @@ const BRIEF_SCHEMA = {
     kpis:{ type:'array', items:{
       type:'object', additionalProperties:false, required:['label','value'],
       properties:{ label:{type:'string'}, value:{type:'string'} },
-    }, description:'정확히 3개: 전월 대비(또는 기간 성장) / 비상금 충족률 / 1억 진행률' },
+    }, description:'정확히 3개: 전월 대비(또는 기간 성장) / 비상금 충족률 / 목표 진행률(출력 지침이 지정한 것)' },
     full:{ type:'string', description:"장관 톤 전문 보고서. '대통령님'으로 시작, 3~5문단, 문단 사이 빈 줄" },
   },
 };
@@ -2353,13 +2361,13 @@ function officePayload(){
 
 async function callBrief(ym, asset, notes){
   const payload = briefPayload(ym, asset, notes);
-  const system = doctrine() + `\n[출력 지침] 아래 데이터로 ${ymLabel(ym)} 결산 브리핑을 작성하라. 숫자는 데이터에 있는 것만 사용하고 검산해서 인용한다. kpis는 정확히 3개: ① 전월 대비 증감(원, +/-표기) ② 비상금 충족률(%) ③ 1억 진행률(%). 지난달 액션 체크 여부가 있으면 이행/미이행을 브리핑에 반영한다.`;
+  const system = doctrine() + `\n[출력 지침] 아래 데이터로 ${ymLabel(ym)} 결산 브리핑을 작성하라. 숫자는 데이터에 있는 것만 사용하고 검산해서 인용한다. ${kpiSpec(anyDebtNow())}. 지난달 액션 체크 여부가 있으면 이행/미이행을 브리핑에 반영한다.`;
   return llmJSON(system, [{ text: JSON.stringify(payload, null, 1) }], BRIEF_SCHEMA);
 }
 async function callBatchBrief(){
   const rows = allAssetYms().map(m=>{ const a=getAsset(m); return { ym:m, total:a.total, 유동성:a.liq, 투자:a.inv, 강제저축:a.forced }; });
   const last = getAsset(allAssetYms().slice(-1)[0]);
-  const system = doctrine() + `\n[출력 지침] 아래는 정부 출범 이후 전체 월별 원장이다. 전 기간을 일괄 결산하는 '역대 총괄 브리핑'을 작성하라. 궤적·전환점·현재 위치를 짚고, 마지막 달 기준의 우선 과제를 액션으로 제시한다. kpis 3개: ① 기간 순자산 성장률(%) ② 비상금 충족률(%) ③ 1억 진행률(%).`;
+  const system = doctrine() + `\n[출력 지침] 아래는 정부 출범 이후 전체 월별 원장이다. 전 기간을 일괄 결산하는 '역대 총괄 브리핑'을 작성하라. 궤적·전환점·현재 위치를 짚고, 마지막 달 기준의 우선 과제를 액션으로 제시한다. ${kpiSpec(anyDebtNow(), '기간 순자산 성장률(%)')}.`;
   return llmJSON(system, [{ text: JSON.stringify({ 월별_원장:rows, 최근월_계좌상세:last?.accounts||null, 최근월_비상금:last?.emerg||null }, null, 1) }], BRIEF_SCHEMA);
 }
 
