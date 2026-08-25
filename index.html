@@ -465,6 +465,7 @@ table.simple tr:last-child td{border-bottom:none;}
 .opt-r .ot{font-size:14.5px;font-weight:800;}
 .opt-r .os{font-size:11px;color:var(--ink3);margin-top:1px;}
 .thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:14px;}
+.shot-note{font-size:11.5px;color:var(--ink2);margin:-8px 0 13px;line-height:1.5;}
 .thumb{aspect-ratio:9/16;background:var(--sur2);border-radius:12px;position:relative;overflow:hidden;}
 .thumb img{width:100%;height:100%;object-fit:cover;display:block;}
 .thumb .x{position:absolute;top:5px;right:5px;width:22px;height:22px;background:rgba(25,31,40,.75);color:#fff;border-radius:50%;border:none;font-size:11px;line-height:1;z-index:2;}
@@ -930,6 +931,7 @@ body.theme-cream .hdr h1{font-family:'Noto Serif KR',serif;font-weight:900;lette
     <div class="wz-title">토스 캡처를 올려주세요</div>
     <div class="wz-desc">'자산 불러오기' <b>전체 집계 뷰</b>(계좌·저축·증권·연금이 다 보이는 화면)를 꼭 포함해 주세요. 여러 장 가능.</div>
     <div class="thumbs" id="thumbs"></div>
+    <div class="shot-note" id="shotNote"></div>
     <button class="btn ghost" onclick="document.getElementById('fileInput').click()">＋ 캡처 추가</button>
     <input type="file" id="fileInput" accept="image/*" multiple onchange="onFilesPicked(this)">
     <div class="wz-foot">
@@ -3364,7 +3366,7 @@ function toggleAct(id,i,el){
 const WZ = { step:1, ym:null, images:[], ext:null, assetSaved:false };
 function startWizard(){
   WZ.step=1; WZ.ym=targetYm(); WZ.images=[]; WZ.ext=null; WZ.assetSaved=false;
-  $('thumbs').innerHTML=''; $('wz2next').disabled=true;
+  $('thumbs').innerHTML=''; $('shotNote').textContent=''; $('wz2next').disabled=true;
   $('noteText').value=''; document.querySelectorAll('#noteChips .chip').forEach(c=>c.classList.remove('on'));
   renderWzMonths();
   wzShow(1); openOv('ov-wizard');
@@ -3404,27 +3406,88 @@ function wzShow(n){
 }
 function wzGo(n){ wzShow(n); }
 
-/* 캡처 업로드 */
-function onFilesPicked(input){
+/* 캡처 업로드 — 보내기 전에 줄인다.
+   이미지 값은 파일 용량이 아니라 가로·세로로 매겨진다. 글자가 읽히는 선까지만 줄이면
+   판독 품질은 그대로 두고 비용과 무료 한도 소모만 덜 수 있다.
+   768은 제미나이가 이미지를 자르는 타일 한 변 — 가로를 그 아래로 맞추면 타일이 한 줄로 끝난다. */
+const SHOT_MAX_W = 768, SHOT_MAX_H = 2048, SHOT_Q = 0.92;
+
+function shotRead(file){
+  return new Promise((res, rej)=>{
+    const r = new FileReader();
+    r.onload = e=>res(e.target.result);
+    r.onerror = ()=>rej(new Error('read'));
+    r.readAsDataURL(file);
+  });
+}
+function shotLoad(src){
+  return new Promise((res, rej)=>{
+    const im = new Image();
+    im.onload = ()=>res(im);
+    im.onerror = ()=>rej(new Error('decode'));
+    im.src = src;
+  });
+}
+function shotPaint(src, w, h){
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  const cx = cv.getContext('2d');
+  cx.imageSmoothingEnabled = true;
+  cx.imageSmoothingQuality = 'high';
+  cx.fillStyle = '#fff'; cx.fillRect(0, 0, w, h);  /* JPEG엔 투명이 없다 — 흰 바탕을 깔지 않으면 검게 뜬다 */
+  cx.drawImage(src, 0, 0, w, h);
+  return cv;
+}
+/* 한 번에 크게 줄이면 글자가 뭉개진다 — 절반씩 내려가다 마지막에 목표 크기로 맞춘다 */
+function shotStep(img, w, h){
+  let cw = img.naturalWidth, ch = img.naturalHeight, src = img;
+  while(cw >= w * 2 && ch >= h * 2){
+    cw = Math.round(cw / 2); ch = Math.round(ch / 2);
+    src = shotPaint(src, cw, ch);
+  }
+  return shotPaint(src, w, h);
+}
+async function shrinkShot(file){
+  const dataUrl = await shotRead(file);
+  const asIs = { b64:dataUrl.split(',')[1], mediaType:file.type, dataUrl, before:file.size, after:file.size };
+  try{
+    const img = await shotLoad(dataUrl);
+    const w = img.naturalWidth, h = img.naturalHeight;
+    if(!w || !h) return asIs;
+    const s = Math.min(1, SHOT_MAX_W / w, SHOT_MAX_H / h);
+    if(s >= 1) return asIs;                        /* 이미 작으면 다시 굽지 않는다 */
+    const cv = shotStep(img, Math.max(1, Math.round(w * s)), Math.max(1, Math.round(h * s)));
+    const small = cv.toDataURL('image/jpeg', SHOT_Q);
+    if(small.length >= dataUrl.length) return asIs;  /* 드물게 더 커지면 원본을 쓴다 */
+    return { b64:small.split(',')[1], mediaType:'image/jpeg', dataUrl:small,
+             before:file.size, after:Math.round(small.length * 3 / 4) };
+  }catch(e){ return asIs; }                        /* 못 줄여도 정산을 막지는 않는다 */
+}
+async function onFilesPicked(input){
   const files = Array.from(input.files||[]);
   input.value='';
-  files.forEach(f=>{
-    if(!/^image\//.test(f.type)){ toast('이미지 파일만 올릴 수 있어요'); return; }
-    if(WZ.images.length>=10){ toast('캡처는 최대 10장까지'); return; }
-    const reader = new FileReader();
-    reader.onload = ev=>{
-      const dataUrl = ev.target.result;
-      const b64 = dataUrl.split(',')[1];
-      WZ.images.push({ b64, mediaType:f.type, dataUrl });
-      renderThumbs();
-    };
-    reader.readAsDataURL(f);
-  });
+  for(const f of files){
+    if(!/^image\//.test(f.type)){ toast('이미지 파일만 올릴 수 있어요'); continue; }
+    if(WZ.images.length>=10){ toast('캡처는 최대 10장까지'); break; }
+    WZ.images.push(await shrinkShot(f));
+    renderThumbs();
+  }
+}
+function shotSize(n){
+  return n >= 1048576 ? (n/1048576).toFixed(1)+'MB' : Math.max(1, Math.round(n/1024))+'KB';
 }
 function renderThumbs(){
   $('thumbs').innerHTML = WZ.images.map((im,i)=>
     `<div class="thumb"><img src="${im.dataUrl}" alt="캡처 ${i+1}"><button class="x" onclick="removeThumb(${i})">✕</button></div>`
   ).join('');
+  const note = $('shotNote');
+  if(note){
+    const b = WZ.images.reduce((s,im)=>s+(im.before||0), 0);
+    const a = WZ.images.reduce((s,im)=>s+(im.after||0), 0);
+    note.textContent = (WZ.images.length && a && a < b)
+      ? `${WZ.images.length}장 · ${shotSize(b)} → ${shotSize(a)}로 줄여서 보냅니다`
+      : '';
+  }
   $('wz2next').disabled = !WZ.images.length;
 }
 function removeThumb(i){ WZ.images.splice(i,1); renderThumbs(); }
