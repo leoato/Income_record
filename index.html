@@ -298,6 +298,7 @@ table.simple tr:last-child td{border-bottom:none;}
 .chat-row.u .bub{background:var(--blue);color:#fff;border-bottom-right-radius:5px;}
 .chat-row.a .bub{background:var(--paper);color:var(--ink);border:1px solid var(--line);border-bottom-left-radius:5px;}
 .chat-empty{text-align:center;color:var(--ink3);font-size:12.5px;padding:44px 20px;line-height:2;}
+.chat-note{margin-top:22px;font-size:11px;color:var(--ink4);line-height:1.6;}
 .chat-foot{flex-shrink:0;display:flex;gap:8px;align-items:flex-end;padding:10px 18px calc(env(safe-area-inset-bottom,0px) + 12px);border-top:1px solid var(--line);background:var(--paper);}
 .chat-in{flex:1;background:var(--sur);border:1.5px solid var(--sur);border-radius:19px;padding:11px 15px;font-size:14px;font-family:inherit;outline:none;resize:none;max-height:110px;line-height:1.5;}
 .chat-in:focus{border-color:var(--blue);background:var(--paper);}
@@ -1682,15 +1683,26 @@ function keyProvider(key){
 const PROV_LABEL = { gemini:'Gemini', anthropic:'Claude', openai:'ChatGPT' };
 function provider(){ return LS.get('mf_provider') || keyProvider(LS.get('mf_key')) || 'gemini'; }
 /* 모델이 단종·개명되면 여기로 걸러 자동 갱신 대상으로 삼는다 (예: 2.5-flash 단종) */
-const MODEL_ERR_RE = /no longer available|not found|is not supported|unsupported|not available|deprecated|update your code/i;
 function isModelErr(e){ return !!e && e.kind === 'model'; }
+/* 모델 오류를 '문구 목록'으로 판별하던 방식은 새 오류가 나올 때마다 뚫렸다
+   ('Developer instruction is not enabled for models/...' 처럼).
+   그래서 반대로 뒤집는다 — 재시도하면 안 되는 것만 못박고, 나머지 요청 실패는 모델 탓으로 보고 다른 모델을 시도한다.
+   최악의 경우라도 API 호출 한 번 더 하는 정도의 손해다. */
 function mapStatus(res, msg){
   if(res.status===401 || res.status===403) return new ApiErr('auth','API 키가 유효하지 않아요. 설정에서 키를 확인해주세요.');
   if(res.status===429) return new ApiErr('rate','요청 한도를 초과했어요. 잠시 후 다시 시도해주세요.');
   if(res.status===529 || res.status>=500) return new ApiErr('server','서버가 붐벼요. 잠시 후 다시 시도해주세요.');
-  if(res.status===404 || MODEL_ERR_RE.test(msg||'')) return new ApiErr('model', msg || `모델을 쓸 수 없어요 (${res.status})`);
+  if(res.status>=400) return new ApiErr('model', msg || `모델을 쓸 수 없어요 (${res.status})`);
   return new ApiErr('bad', msg || `API 오류 (${res.status})`);
 }
+/* 실패한 모델을 기억한다. 이게 없으면 목록을 새로 받아도 같은 점수로 같은 모델을 다시 골라 무한히 같은 곳에서 막힌다. */
+function badModels(){ const b = LS.get('mf_badmodels'); return Array.isArray(b) ? b : []; }
+function markBadModel(m){
+  if(!m) return;
+  const b = badModels();
+  if(b.indexOf(m) < 0){ b.push(m); LS.set('mf_badmodels', b.slice(-20)); }
+}
+function clearBadModels(){ LS.del('mf_badmodels'); }
 function parseJSONOut(text){
   if(!text) throw new ApiErr('empty','응답이 비어 있어요. 다시 시도해주세요.');
   try{ return JSON.parse(text); }
@@ -1797,9 +1809,13 @@ function modelScore(n, fast){
   return modelVersion(n)*10 + t - (/preview|exp|beta|latest|snapshot/i.test(n) ? 0.5 : 0);
 }
 function pickModel(names, fast){
-  const ok = (names||[]).filter(n=>!MODEL_EXCLUDE.test(n));
-  if(!ok.length) return null;
-  return ok.slice().sort((a,b)=>modelScore(b,fast)-modelScore(a,fast))[0];
+  const usable = (names||[]).filter(n=>!MODEL_EXCLUDE.test(n));
+  if(!usable.length) return null;
+  const bad = badModels();
+  /* 실패한 모델은 뺀다. 전부 실패했으면 차라리 다시 시도한다 — 아무것도 못 고르는 것보단 낫다 */
+  const ok = usable.filter(n=>bad.indexOf(n) < 0);
+  const pool = ok.length ? ok : usable;
+  return pool.slice().sort((a,b)=>modelScore(b,fast)-modelScore(a,fast))[0];
 }
 function geminiPick(names){ return pickModel(names,false); }
 /* 집무실용 — 대화는 속도가 우선이라 경량 등급을 먼저 고른다 */
@@ -1821,19 +1837,29 @@ async function ensureModels(){
   await refreshModels();
 }
 /* 모델 오류면 목록을 갱신해 한 번만 재시도한다 */
+/* 모델이 막히면 다른 모델로 돌려가며 시도한다 (최대 3개).
+   왜 반복인가: 단종·미지원·권한 등 막히는 이유는 계속 새로 생기는데, 그 문구를 다 알 수는 없다.
+   막힌 모델을 빼고 다음 후보로 넘어가는 것만이 어떤 이유에도 통한다. */
 async function withModelFallback(run, pick){
   await ensureModels();
-  try{ return await run(pick()); }
-  catch(e){
-    if(!isModelErr(e)) throw e;
-    const before = pick();
-    await refreshModels();
-    const after = pick();
-    if(after && after !== before) toast(`모델이 단종돼 ${after}로 갱신했어요`);
-    if(!after || after === before) throw e;      // 갱신해도 그대로면 원래 오류를 보고
-    renderKeyArea();
-    return run(after);
+  let lastErr = null, tried = [];
+  for(let i=0; i<3; i++){
+    const model = pick();
+    if(!model || tried.indexOf(model) >= 0) break;
+    tried.push(model);
+    try{ return await run(model); }
+    catch(e){
+      if(!isModelErr(e)) throw e;               /* 인증·한도·서버 문제는 모델을 바꿔도 소용없다 */
+      lastErr = e;
+      markBadModel(model);
+      try{ await refreshModels(); }catch{ break; }
+      const next = pick();
+      if(!next || next === model) break;
+      if(i === 0) toast(`${model.replace(/^models\//,'')} 사용 불가 — 다른 모델로 바꿔요`);
+      renderKeyArea();
+    }
   }
+  throw lastErr || new ApiErr('model','쓸 수 있는 모델을 찾지 못했어요. 설정에서 키를 다시 등록해주세요.');
 }
 async function geminiJSON(system, parts, schema, modelOverride){
   const model = modelOverride || LS.get('mf_gmodel') || LS.get('mf_gmodel_fast');
@@ -2404,7 +2430,9 @@ function renderChat(){
   const b = $('chatBody');
   const c = getChat();
   if(!c.length){
-    b.innerHTML = `<div class="chat-empty">${pixMin()}장관이 집무실에서 대기 중입니다.<br>재정 현황·목표·지난 브리핑을 모두 파악하고 있습니다.<br><br>예) "벙커 목표를 다시 계산해줘"<br>예) "지금 비상금 충족률이 어떻게 되지?"</div>`;
+    /* 전송 고지는 토스트가 아니라 여기 둔다 — 매번 튀어나오지 않고, 대화를 시작하기 전에 항상 보인다 */
+    b.innerHTML = `<div class="chat-empty">${pixMin()}장관이 집무실에서 대기 중입니다.<br>재정 현황·목표·지난 브리핑을 모두 파악하고 있습니다.<br><br>예) "벙커 목표를 다시 계산해줘"<br>예) "지금 비상금 충족률이 어떻게 되지?"
+      <div class="chat-note">말할 때마다 AI 서버로 전송돼요. 정산은 월 1회지만 채팅은 매 턴이에요.</div></div>`;
     return;
   }
   b.innerHTML = c.map((m,i)=>chatRowHTML(m,i)).join('');
@@ -2512,10 +2540,6 @@ function applyProp(i, j){
 function openOffice(){
   openOv('ov-office');
   renderChat();
-  if(!LS.get('mf_office_seen')){
-    LS.set('mf_office_seen', true);
-    toast('집무실 대화는 말할 때마다 AI 서버로 전송돼요. 정산은 월 1회지만 채팅은 매 턴이에요.');
-  }
   setTimeout(()=>$('chatIn') && $('chatIn').focus(), 250);
 }
 
@@ -3783,6 +3807,7 @@ async function verifyKey(){
   if(v.length < 20){ toast('키가 너무 짧아요'); return; }
   $('keyBtn').textContent='확인 중…'; $('keyBtn').disabled=true;
   try{
+    clearBadModels();          /* 키를 다시 등록하면 백지에서 시작 — 잠깐 막혔던 모델을 영영 배제하지 않는다 */
     const model = await validateKey(v);
     LS.set('mf_key', v);
     renderKeyArea(); renderMin();
@@ -3792,7 +3817,7 @@ async function verifyKey(){
     $('keyBtn').textContent='검증'; $('keyBtn').disabled=false;
   }
 }
-function removeKey(){ ['mf_key','mf_provider','mf_gmodel','mf_gmodel_fast','mf_gauth'].forEach(k=>LS.del(k)); renderKeyArea(); renderMin(); toast('키 삭제됨 — 장관 기능 잠김'); }
+function removeKey(){ ['mf_key','mf_provider','mf_gmodel','mf_gmodel_fast','mf_gauth','mf_badmodels'].forEach(k=>LS.del(k)); renderKeyArea(); renderMin(); toast('키 삭제됨 — 장관 기능 잠김'); }
 
 function renderSrcList(){
   const sources = getSources();
