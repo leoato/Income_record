@@ -480,6 +480,10 @@ table.simple tr:last-child td{border-bottom:none;}
 .ext-r .en .note{display:block;font-size:10px;color:var(--ink3);}
 .ext-r input{width:112px;text-align:right;background:var(--sur);border:1.5px solid var(--sur);border-radius:9px;padding:8px 10px;font-size:13.5px;font-weight:700;outline:none;font-variant-numeric:tabular-nums;}
 .ext-r input:focus{border-color:var(--blue);background:var(--paper);}
+.ext-r.debt input{color:#9A2B22;}
+.ext-r .debt-b{display:inline-block;margin-left:5px;padding:1px 5px;border-radius:5px;
+  background:#9A2B22;color:#fff;font-size:9.5px;font-weight:800;vertical-align:1px;}
+.ext-debt{font-size:11.5px;color:#9A2B22;font-weight:700;margin:-4px 0 9px;}
 .verify{border-radius:13px;padding:13px 15px;font-size:12.5px;font-weight:700;margin:12px 0;line-height:1.5;}
 .verify.ok{background:var(--good-bg);color:var(--good);}
 .verify.ok::before{content:'\2713  ';}
@@ -960,6 +964,7 @@ body.theme-cream .hdr h1{font-family:'Noto Serif KR',serif;font-weight:900;lette
         <input type="text" id="extTotal" inputmode="numeric" oninput="fmtInput(this);checkSum()">
       </div>
     </div>
+    <div class="ext-debt" id="extDebt" style="display:none"></div>
     <div class="verify ok" id="verifyBox"></div>
     <div class="wz-foot">
       <button class="btn ghost" onclick="wzGo(2)">이전</button>
@@ -2120,9 +2125,10 @@ function extractSystem(){
 규칙:
 - '자산 불러오기' 전체 집계 뷰(계좌/저축/증권/연금이 다 보이는 화면)를 기준으로 삼고, 상세 뷰는 교차검증에 사용한다.
 - 금액은 원 단위 정수. 같은 계좌가 여러 캡처에 나와도 한 번만.
-- 잔액 0원이어도 기존 주요 계좌(만기 적금, 청산한 주식계좌 등)는 포함한다(추적용). 카드 결제예정액·대출·광고는 제외.
-- 화면에 표시된 '총 자산' 숫자를 total_displayed로 보고한다.
-- 계좌 그룹: '유동성 · 일상'(입출금·생활비), '유동성 · 비상금'(비상금 성격 CMA·적금), '유동성 · 적금재원'(목적자금), '강제저축'(청약·적금), '투자'(ISA·연금·주식). 성격에 맞게 분류한다.
+- 잔액 0원이어도 기존 주요 계좌(만기 적금, 청산한 주식계좌 등)는 포함한다(추적용). 카드 결제예정액·광고는 제외.
+- 대출·마이너스통장 등 '갚아야 할 잔액'은 '부채' 그룹으로 포함한다. 부채도 금액은 양수로 보고한다(부호를 붙이지 않는다).
+- 화면에 표시된 '총 자산' 숫자를 total_displayed로 보고한다. 이 숫자에는 부채가 들어 있지 않다 — 부채는 여기서 빼지도 더하지도 않는다.
+- 계좌 그룹: '유동성 · 일상'(입출금·생활비), '유동성 · 비상금'(비상금 성격 CMA·적금), '유동성 · 적금재원'(목적자금), '강제저축'(청약·적금), '투자'(ISA·연금·주식), '부채'(대출·마이너스통장 — 갚아야 할 잔액). 성격에 맞게 분류한다.
 ${extractHint() ? '\n[이 사용자의 계좌 분류 기준]\n'+extractHint() : ''}${(LS.get('mf_accounts')||[]).length ? '\n[알려진 계좌 목록 — 캡처에서 이 이름들을 우선 찾아 같은 이름·그룹으로 보고]\n'+(LS.get('mf_accounts')||[]).map(r=>`- ${r.g}: ${r.n}`).join('\n') : ''}`;
 }
 
@@ -3536,18 +3542,32 @@ function renderExt(){
   $('extTable').innerHTML = WZ.ext.accounts.map((a,i)=>{
     const pv = prevBy[a.n.replace(/\s/g,'')];
     const deltaNote = pv!==undefined ? ` · 전월 ${fmt(pv)} (${a.v-pv>=0?'+':''}${fmt(a.v-pv)})` : '';
-    return `<div class="ext-r"><div class="en">${esc(a.n)}<span class="note">${esc(a.g)}${a.note?' · '+esc(a.note):''}${deltaNote}</span></div>
-     <input type="text" inputmode="numeric" value="${fmt(a.v)}" data-i="${i}" oninput="fmtInput(this);checkSum()"></div>`;
+    const dg = isDebt(a.g);
+    return `<div class="ext-r${dg?' debt':''}"><div class="en">${esc(a.n)}${dg?'<span class="debt-b">빚</span>':''}<span class="note">${esc(a.g)}${a.note?' · '+esc(a.note):''}${deltaNote}</span></div>
+     <input type="text" inputmode="numeric"${dg?' data-debt="1"':''} value="${fmt(a.v)}" data-i="${i}" oninput="fmtInput(this);checkSum()"></div>`;
   }).join('');
   $('extTotal').value = WZ.ext.total!=null ? fmt(WZ.ext.total) : '';
   checkSum();
 }
+/* 부채는 캡처의 '총 자산'에 안 들어 있다 — 합계 검증에서 뺀다.
+   섞으면 부채액만큼 항상 불일치가 나서 4단계가 영영 안 열린다. */
 function extSum(){
   let sum = 0;
-  document.querySelectorAll('#extTable input').forEach(inp=>sum+=numOf(inp.value));
+  document.querySelectorAll('#extTable input:not([data-debt])').forEach(inp=>sum+=numOf(inp.value));
+  return sum;
+}
+function extDebtSum(){
+  let sum = 0;
+  document.querySelectorAll('#extTable input[data-debt="1"]').forEach(inp=>sum+=numOf(inp.value));
   return sum;
 }
 function checkSum(){
+  const dBox = $('extDebt');
+  if(dBox){
+    const n = document.querySelectorAll('#extTable input[data-debt="1"]').length;
+    dBox.style.display = n ? '' : 'none';
+    dBox.textContent = n ? `부채 ${n}건 · 합계 ${fmt(extDebtSum())}원 (총자산 검증 대상 아님)` : '';
+  }
   const sum = extSum();
   const target = $('extTotal').value.trim()==='' ? NaN : numOf($('extTotal').value);
   const box = $('verifyBox'), next = $('wz4next');
