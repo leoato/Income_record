@@ -1120,7 +1120,8 @@ body.theme-cream .hdr h1{font-family:'Noto Serif KR',serif;font-weight:900;lette
 const A_MODEL = 'claude-opus-5';
 const GOAL = 100000000;            // 순자산 1억
 const emergGoal = ()=>LS.get('mf_emerg_goal', 5000000);   // 비상금 목표 (시드로 조정 가능)
-const GROUPS = ['유동성 · 일상','유동성 · 비상금','유동성 · 적금재원','강제저축','투자'];
+const DEBT_GROUP = '부채';
+const GROUPS = ['유동성 · 일상','유동성 · 비상금','유동성 · 적금재원','강제저축','투자',DEBT_GROUP];
 const NEW_SHADES = ['#DB2777','#0D9488','#65A30D','#0284C7','#9333EA'];
 
 /* 국정 컨텍스트: 시드에서 불러오고, 없으면 범용 원칙으로 동작 */
@@ -1145,6 +1146,21 @@ const allIncKeys = ()=>Object.keys(localStorage).filter(k=>/^inc_\d{4}_\d{2}_\d{
 const assetKey = ym=>`mf_asset_${ym}`;
 const briefKey = id=>`mf_brief_${id}`;
 const allAssetYms = ()=>Object.keys(localStorage).filter(k=>k.startsWith('mf_asset_')).map(k=>k.slice(9)).sort();
+/* 부채는 계좌 그룹 하나로 다룬다 — 금액은 양수로 저장하고 순자산은 여기서 뺀다.
+   total 필드의 뜻은 '총자산'으로 못박혀 있다. 과거 스냅샷을 고치지 않기 위해서다. */
+const isDebt = g => g === DEBT_GROUP;
+function assetTotalOf(snap){
+  if(!snap) return 0;
+  if(!snap.accounts) return snap.total || 0;          /* 계좌 명세가 없는 옛 스냅샷 */
+  return snap.accounts.reduce((s,a)=> s + (isDebt(a.g) ? 0 : (a.v||0)), 0);
+}
+function debtTotalOf(snap){
+  if(!snap || !snap.accounts) return 0;
+  return snap.accounts.reduce((s,a)=> s + (isDebt(a.g) ? (a.v||0) : 0), 0);
+}
+function netOf(snap){ return assetTotalOf(snap) - debtTotalOf(snap); }
+/* 전 기간에 부채가 한 번이라도 있었나 — 다 갚은 사람의 궤적도 남겨야 하므로 '이번 달'로 보지 않는다 */
+function hasAnyDebt(snaps){ return (snaps||[]).some(s => debtTotalOf(s) > 0); }
 const allBriefIds = ()=>Object.keys(localStorage).filter(k=>k.startsWith('mf_brief_')).map(k=>k.slice(9));
 
 function getSources(){
