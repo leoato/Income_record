@@ -484,6 +484,8 @@ table.simple tr:last-child td{border-bottom:none;}
 .ext-r .debt-b{display:inline-block;margin-left:5px;padding:1px 5px;border-radius:5px;
   background:#9A2B22;color:#fff;font-size:9.5px;font-weight:800;vertical-align:1px;}
 .ext-debt{font-size:11.5px;color:#9A2B22;font-weight:700;margin:-4px 0 9px;}
+.nw-split{display:flex;gap:12px;font-size:11.5px;color:var(--ink2);margin-top:7px;}
+.nw-split .dbt{color:#9A2B22;}
 .verify{border-radius:13px;padding:13px 15px;font-size:12.5px;font-weight:700;margin:12px 0;line-height:1.5;}
 .verify.ok{background:var(--good-bg);color:var(--good);}
 .verify.ok::before{content:'\2713  ';}
@@ -2950,6 +2952,29 @@ function areaChartSVG(list, ariaLabel){
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block;margin-top:12px" role="img" aria-label="${ariaLabel||'추이 그래프'}">${s}</svg>`;
 }
 
+/* 총자산·순자산 두 선. 두 선 사이 간격이 곧 빚이라, 좁아지는 게 빚 갚는 사람의 성과 화면이다.
+   v=순자산(주선), v2=총자산(점선). 순자산은 빚이 더 크면 음수가 되므로 0에서 자르지 않는다. */
+function twoLineChartSVG(list, ariaLabel){
+  const W=320, H=104, P={l:6,r:6,t:12,b:16};
+  const vals = list.map(p=>p.v).concat(list.map(p=>p.v2));
+  let mn = Math.min(...vals), mx = Math.max(...vals);
+  let pad = (mx-mn)*0.15;
+  if(pad<=0) pad = Math.max(Math.abs(mx)*0.1, 1);
+  const y0 = mn-pad, y1 = mx+pad;
+  const x = i=>P.l + (W-P.l-P.r) * (list.length===1 ? 0.5 : i/(list.length-1));
+  const y = v=>P.t + (H-P.t-P.b) * (1 - (v-y0)/(y1-y0));
+  const pts = k=>list.map((p,i)=>`${x(i).toFixed(1)},${y(p[k]).toFixed(1)}`).join(' ');
+  let s = `<polygon points="${P.l},${H-P.b} ${pts('v')} ${(W-P.r).toFixed(1)},${H-P.b}" style="fill:var(--blue-bg)"/>`;
+  s += `<polyline points="${pts('v2')}" style="fill:none;stroke:var(--ink4);stroke-width:1.5;stroke-dasharray:3 2.5"/>`;
+  s += `<polyline points="${pts('v')}" style="fill:none;stroke:var(--blue);stroke-width:2;stroke-linejoin:round;stroke-linecap:round"/>`;
+  s += `<circle cx="${x(list.length-1).toFixed(1)}" cy="${y(list[list.length-1].v).toFixed(1)}" r="3.4" style="fill:var(--blue);stroke:var(--paper);stroke-width:1.5"/>`;
+  const li = [0, Math.floor((list.length-1)/2), list.length-1];
+  [...new Set(li)].forEach(i=>{
+    s += `<text x="${x(i).toFixed(1)}" y="${H-3}" text-anchor="${i===0?'start':i===list.length-1?'end':'middle'}" font-size="8.5" style="fill:var(--ink4)">${list[i].ym.slice(2).replace('-','.')}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block;margin-top:12px" role="img" aria-label="${ariaLabel||'총자산·순자산 추이'}">${s}</svg>`;
+}
+
 /* 자산 구성 도넛 — 5주머니 비중 (팔레트: dataviz validator ALL PASS) */
 const COMP_SLICES = [
   { g:'유동성 · 비상금',   label:'비상금',      color:'#06A561' },
@@ -3110,19 +3135,26 @@ function renderAsset(){
   }
   const assets = yms.map(getAsset);
   const latest = assets[assets.length-1], prev = assets[assets.length-2];
-  const d = prev ? latest.total-prev.total : 0;
-  const pct = prev ? (d/prev.total*100).toFixed(1) : '0.0';
-  const goalPct = latest.total/GOAL*100;
+  /* 부채가 전 기간 한 번도 없으면 예전과 똑같이 보여준다 — 빚 없는 사람 화면은 건드리지 않는다 */
+  const anyDebt = hasAnyDebt(assets);
+  const net = netOf(latest), gross = assetTotalOf(latest), dbt = debtTotalOf(latest);
+  const prevNet = prev ? netOf(prev) : null;
+  const d = prevNet !== null ? net-prevNet : 0;
+  const pct = prevNet ? (d/Math.abs(prevNet)*100).toFixed(1) : '0.0';
+  const goalPct = net/GOAL*100;
   const emerg = latest.emerg ?? null;
   let h = `<div class="card">
     <div class="card-lbl">순자산 · ${ymLabel(latest.ym)} 말</div>
-    <div class="networth">${fmtWon(latest.total)}</div>
+    <div class="networth">${fmtWon(net)}</div>
     ${prev?`<div class="delta ${d>=0?'up':'down'}">${d>=0?'▲':'▼'} ${fmt(Math.abs(d))}원 (${d>=0?'+':''}${pct}%)</div>`:''}
-    ${assets.length>=3 ? areaChartSVG(assets.map(a=>({ym:a.ym,v:a.total})), '순자산 전체 추이') : ''}
+    ${anyDebt?`<div class="nw-split"><span>총자산 <b>${fmt(gross)}원</b></span><span class="dbt">부채 <b>${fmt(dbt)}원</b></span></div>`:''}
+    ${assets.length>=3 ? (anyDebt
+      ? twoLineChartSVG(assets.map(a=>({ym:a.ym, v:netOf(a), v2:assetTotalOf(a)})), '총자산·순자산 추이')
+      : areaChartSVG(assets.map(a=>({ym:a.ym,v:a.total})), '순자산 전체 추이')) : ''}
   </div>
   <div class="kpi2">
     <div class="card" style="margin:0"><div class="card-lbl">1억 목표</div><div style="font-size:18px;font-weight:800">${goalPct.toFixed(1)}%</div>
-      <div class="goal-track"><div class="goal-fill" style="width:${Math.min(100,goalPct)}%"></div></div>
+      <div class="goal-track"><div class="goal-fill" style="width:${Math.max(0,Math.min(100,goalPct))}%"></div></div>
       <div style="font-size:10.5px;color:var(--ink3)">${esc(roadmapCfg()?.sub ? roadmapCfg().sub+' 달성 목표' : '순자산 목표')}</div></div>
     <div class="card" style="margin:0"><div class="card-lbl">비상금 충족률</div><div style="font-size:18px;font-weight:800">${emerg!=null?(emerg/emergGoal()*100).toFixed(1)+'%':'—'}</div>
       <div class="goal-track"><div class="goal-fill emerg" style="width:${emerg!=null?Math.min(100,emerg/emergGoal()*100):0}%"></div></div>
