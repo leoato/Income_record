@@ -2166,7 +2166,7 @@ const CHAT_SCHEMA = {
         goalTarget:{ anyOf:[{type:'number'},{type:'null'}], description:'kind가 goal일 때 새 목표 금액(원). 안 바꾸면 null' },
         goalDue:{ anyOf:[{type:'string'},{type:'null'}], description:'kind가 goal일 때 새 기한 YYYY-MM-DD. 안 바꾸면 null' },
         actionIdx:{ anyOf:[{type:'number'},{type:'null'}], description:'kind가 action일 때 최근_브리핑_액션의 i 값' },
-        goalBasis:{ anyOf:[{type:'string'},{type:'null'}], description:"kind가 goal_new일 때 진행률 기준. 'total'(총자산) 또는 그룹명 또는 계좌명" },
+        goalBasis:{ anyOf:[{type:'string'},{type:'null'}], description:"kind가 goal_new일 때 진행률 기준. 'total'(총자산), 'debt'(부채 전체 — 갚아서 줄이는 목표, 목표액은 보통 0), 또는 그룹명 또는 계좌명" },
       },
     }},
   },
@@ -2257,16 +2257,39 @@ function briefPayload(ym, asset, notes){
   };
 }
 /* 집무실 페이로드 — 대화 길이와 무관하게 크기가 상수로 유지되어야 한다 */
-/* 목표 기준 3종: 총자산(total) / 그룹 합계(group) / 특정 계좌(account) */
+/* 목표 기준 4종: 총자산(total) / 부채 전체(debt) / 그룹 합계(group) / 특정 계좌(account) */
 function goalCurrent(g, latest){
   if(!latest) return 0;
+  if(g.debt) return debtTotalOf(latest);
   if(g.total) return Number(latest.total) || 0;
   if(!latest.accounts) return 0;
   if(g.group) return latest.accounts.filter(a=>a.g===g.group).reduce((s,a)=>s+a.v,0);
   if(g.account) return latest.accounts.filter(a=>normName(a.n)===normName(g.account)).reduce((s,a)=>s+a.v,0);
   return 0;
 }
+/* 목표 진행률(%). 자산은 늘어야, 빚은 줄어야 성공이라 방향이 반대다. */
+function goalProgress(g, latest){
+  const cur = goalCurrent(g, latest);
+  if(g.debt){
+    const start = (g.start != null) ? g.start : debtStartFallback();
+    const span = start - (g.target || 0);
+    if(!(span > 0)) return cur <= (g.target||0) ? 100 : 0;
+    return Math.max(0, Math.min(100, (start - cur) / span * 100));
+  }
+  if(!g.target) return 0;
+  return Math.max(0, Math.min(100, cur / g.target * 100));
+}
+/* start가 없는 부채 목표는 부채가 처음 잡힌 달의 값으로 대신한다 */
+function debtStartFallback(){
+  const yms = allAssetYms();
+  for(let i=0;i<yms.length;i++){
+    const d = debtTotalOf(getAsset(yms[i]));
+    if(d > 0) return d;
+  }
+  return 0;
+}
 function goalBasisLabel(g){
+  if(g.debt) return '부채';
   if(g.total) return '총자산';
   if(g.group) return g.group;
   if(g.account) return g.account;
@@ -2421,12 +2444,19 @@ function applyProp(i, j){
       const goals = LS.get('mf_goals') || [];
       const label = (p.goalLabel || p.label || '').trim();
       if(!label) throw new Error('목표 이름이 비어 있어요.');
-      if(!p.goalTarget) throw new Error('목표 금액이 없어요.');
+      const basis = (p.goalBasis || 'total').trim();
+      const isDebtGoal = (basis === 'debt' || basis === DEBT_GROUP);
+      /* 빚 목표는 0원(완제)이 정상이라 금액 0을 막지 않는다 */
+      if(!p.goalTarget && !isDebtGoal) throw new Error('목표 금액이 없어요.');
       if(goals.some(x=>normName(x.label)===normName(label)))
         throw new Error(`'${label}' 목표는 이미 있어요. 수정으로 제안해달라고 하세요.`);
-      const g = { label, target:p.goalTarget };
-      const basis = (p.goalBasis || 'total').trim();
-      if(basis === 'total' || basis === '총자산') g.total = true;
+      const g = { label, target:p.goalTarget || 0 };
+      if(isDebtGoal){
+        g.debt = true;
+        const cur = latestAssetWithAccounts();
+        g.start = cur ? debtTotalOf(cur.a) : 0;
+      }
+      else if(basis === 'total' || basis === '총자산') g.total = true;
       else if(GROUPS.includes(basis)) g.group = basis;
       else {
         const acct = getAcctReg().find(a=>normName(a.n)===normName(basis));
@@ -3035,9 +3065,9 @@ function goalsHTML(assets){
   let h = `<div class="sec-title">목표 <span class="s">${ymLabel(latest.ym)} 말 기준</span>${addBtn}</div>`;
   goals.forEach((g,gi)=>{
     const cur = goalCurrent(g, latest);
-    const pct = Math.min(100, cur/g.target*100);
+    const pct = goalProgress(g, latest);
     const dd = g.due ? dday(g.due) : null;
-    const remain = Math.max(0, g.target-cur);
+    const remain = g.debt ? Math.max(0, cur-(g.target||0)) : Math.max(0, g.target-cur);
     h += `<div class="card" onclick="openGoalSheet(${gi})">
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
         <div style="font-size:14px;font-weight:800">${esc(g.label)} <span style="font-size:10.5px;font-weight:600;color:var(--ink4)">${esc(goalBasisLabel(g))}</span></div>
@@ -3045,7 +3075,7 @@ function goalsHTML(assets){
       </div>
       <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--ink2);margin-bottom:7px">
         <span><b style="font-size:15.5px;color:var(--ink)">${fmtMan(cur)}</b> / ${fmtMan(g.target)}</span>
-        <span style="font-weight:600">${remain?`남은 ${fmtMan(remain)}`:'달성 ✓'}</span>
+        <span style="font-weight:600">${remain?`${g.debt?'갚을':'남은'} ${fmtMan(remain)}`:'달성 ✓'}</span>
       </div>
       <div class="goal-track"><div class="goal-fill${remain?'':' emerg'}" style="width:${pct}%"></div></div>
       <div style="font-size:10.5px;color:var(--ink3);margin-top:4px">${pct.toFixed(1)}%</div>
@@ -3059,13 +3089,14 @@ function openGoalSheet(i){
   const goals = LS.get('mf_goals')||[];
   GOAL_EDIT = (typeof i === 'number' && goals[i]) ? i : -1;
   const g = GOAL_EDIT >= 0 ? goals[GOAL_EDIT] : null;
-  $('goalBasis').innerHTML = ['<option value="total">총자산 전체</option>']
-    .concat(GROUPS.map(x=>`<option value="group:${esc(x)}">${esc(x)} 합계</option>`))
-    .concat(getAcctReg().map(a=>`<option value="account:${esc(a.n)}">${esc(a.n)}</option>`))
+  /* 부채는 '그룹 합계'로 고르면 늘어야 성공인 목표가 되어버린다 — 전용 항목으로 따로 뺀다 */
+  $('goalBasis').innerHTML = ['<option value="total">총자산 전체</option>','<option value="debt">부채 전체 (갚아서 줄이기)</option>']
+    .concat(GROUPS.filter(x=>!isDebt(x)).map(x=>`<option value="group:${esc(x)}">${esc(x)} 합계</option>`))
+    .concat(getAcctReg().filter(a=>!isDebt(a.g)).map(a=>`<option value="account:${esc(a.n)}">${esc(a.n)}</option>`))
     .join('');
   $('goalSheetT').textContent = g ? '목표 수정' : '목표 추가';
   $('goalLabel').value = g ? g.label : '';
-  $('goalBasis').value = g ? (g.total ? 'total' : g.group ? 'group:'+g.group : 'account:'+g.account) : 'total';
+  $('goalBasis').value = g ? (g.debt ? 'debt' : g.total ? 'total' : g.group ? 'group:'+g.group : 'account:'+g.account) : 'total';
   $('goalTarget').value = g && g.target ? Number(g.target).toLocaleString() : '';
   $('goalDue').value = g && g.due ? g.due : '';
   $('goalDel').style.display = g ? '' : 'none';
@@ -3074,15 +3105,23 @@ function openGoalSheet(i){
 function saveGoal(){
   const label = $('goalLabel').value.trim();
   const target = numOf($('goalTarget').value);
-  if(!label) return toast('목표 이름을 입력해주세요');
-  if(!target) return toast('목표 금액을 입력해주세요');
   const basis = $('goalBasis').value || 'total';
+  if(!label) return toast('목표 이름을 입력해주세요');
+  /* 빚 목표는 0원(완제)이 정상이라 금액 0을 막지 않는다 */
+  if(basis !== 'debt' && !target) return toast('목표 금액을 입력해주세요');
+  const goals = LS.get('mf_goals')||[];
   const g = { label, target };
-  if(basis === 'total') g.total = true;
+  if(basis === 'debt'){
+    g.debt = true;
+    /* 진행률의 분모 — 수정 중이면 원래 시작값을 지킨다. 안 그러면 갚을수록 진행률이 0으로 되돌아간다 */
+    const old = GOAL_EDIT >= 0 ? goals[GOAL_EDIT] : null;
+    const cur = latestAssetWithAccounts();
+    g.start = (old && old.start != null) ? old.start : (cur ? debtTotalOf(cur.a) : 0);
+  }
+  else if(basis === 'total') g.total = true;
   else if(basis.startsWith('group:')) g.group = basis.slice(6);
   else g.account = basis.slice(8);
   const due = $('goalDue').value; if(due) g.due = due;
-  const goals = LS.get('mf_goals')||[];
   if(GOAL_EDIT >= 0) goals[GOAL_EDIT] = g; else goals.push(g);
   LS.set('mf_goals', goals);
   closeAllSheets(); renderAsset();
