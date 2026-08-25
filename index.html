@@ -1795,12 +1795,20 @@ async function geminiListModels(key){
    목록은 각 사 API에서 실시간으로 받아오므로 새 모델이 나오면 규칙 수정 없이 승계된다.
    (2026-08 확인: gemini-3.7-flash / gemini-3.1-pro-preview / gpt-5.6-sol·terra·luna / claude-opus-5) */
 const MODEL_EXCLUDE = /tts|imagen|image|embedding|audio|live|veo|banana|realtime|transcri|whisper|moderation|dall-e|sora|guard|instruct|davinci|babbage|curie|ada|edit|similarity|search-|codex/i;
+/* 이름에 든 날짜를 버전으로 읽지 않는다.
+   'antigravity-preview-05-2026' 이 버전 25.26 → 252점으로 잡혀 진짜 모델(33점)을 제치고
+   1순위가 되던 버그가 있었다. 버전은 한 자리~두 자리지 2026 같은 수가 아니다. */
 function modelVersion(n){
-  const m = String(n).match(/(\d+)[.\-](\d+)/);          // 3.7 / 5.6 / 4-5
-  if(m) return parseInt(m[1],10) + parseInt(m[2],10)/100;
-  const s2 = String(n).match(/[-.](\d+)/);                // opus-5
-  return s2 ? parseInt(s2[1],10) : 0;
+  const s = String(n).replace(/\b20\d{2}\b/g, '');       // 연도 제거
+  const m = s.match(/(\d+)[.\-](\d+)/);                  // 3.7 / 5.6 / 4-5
+  if(m){ const a = parseInt(m[1],10), b = parseInt(m[2],10); if(a <= 20) return a + b/100; }
+  const s2 = s.match(/[-.](\d+)/);                       // opus-5
+  if(s2){ const v = parseInt(s2[1],10); if(v <= 20) return v; }
+  return 0;
 }
+/* 대화용 모델 계열만 고른다. 계열 밖 실험 모델이 끼어들면 버전 점수만 높고 대화는 엉망이라
+   같은 말을 끝없이 반복하는 답변이 나온다. 계열에 맞는 게 하나도 없을 때만 전체에서 고른다. */
+const CHAT_FAMILY = /gemini|gpt|claude|(^|\/)o\d[-.]?/i;
 const TIER_MAIN = [ [/\bopus/i,3.1], [/fable|sol\b|pro\b/i,3], [/terra|sonnet|flash(?!.*lite)/i,2], [/luna|haiku|lite|mini/i,1] ];
 const TIER_FAST = [ [/luna|haiku|flash(?!.*lite)/i,3], [/terra|sonnet|lite|mini/i,2], [/fable|sol\b|pro\b|opus/i,1] ];
 function modelScore(n, fast){
@@ -1809,8 +1817,10 @@ function modelScore(n, fast){
   return modelVersion(n)*10 + t - (/preview|exp|beta|latest|snapshot/i.test(n) ? 0.5 : 0);
 }
 function pickModel(names, fast){
-  const usable = (names||[]).filter(n=>!MODEL_EXCLUDE.test(n));
+  let usable = (names||[]).filter(n=>!MODEL_EXCLUDE.test(n));
   if(!usable.length) return null;
+  const fam = usable.filter(n=>CHAT_FAMILY.test(n));
+  if(fam.length) usable = fam;
   const bad = badModels();
   /* 실패한 모델은 뺀다. 전부 실패했으면 차라리 다시 시도한다 — 아무것도 못 고르는 것보단 낫다 */
   const ok = usable.filter(n=>bad.indexOf(n) < 0);
@@ -1832,11 +1842,16 @@ async function refreshModels(){
   LS.set('mf_gmodel_fast', pickModel(names,true) || main);
   return main;
 }
+/* 이미 저장된 모델이 대화용 계열 밖이면 버리고 다시 고른다.
+   계열 밖 모델은 오류를 내는 게 아니라 '이상한 답변'을 성공적으로 돌려주기 때문에
+   폴백이 발동하지 않는다 — 저장값을 직접 걸러내지 않으면 계속 그 모델을 쓰게 된다. */
+function badStored(m){ return !!m && (MODEL_EXCLUDE.test(m) || !CHAT_FAMILY.test(m)); }
 async function ensureModels(){
+  if(badStored(LS.get('mf_gmodel'))) LS.del('mf_gmodel');
+  if(badStored(LS.get('mf_gmodel_fast'))) LS.del('mf_gmodel_fast');
   if(LS.get('mf_gmodel') && LS.get('mf_gmodel_fast')) return;
   await refreshModels();
 }
-/* 모델 오류면 목록을 갱신해 한 번만 재시도한다 */
 /* 모델이 막히면 다른 모델로 돌려가며 시도한다 (최대 3개).
    왜 반복인가: 단종·미지원·권한 등 막히는 이유는 계속 새로 생기는데, 그 문구를 다 알 수는 없다.
    막힌 모델을 빼고 다음 후보로 넘어가는 것만이 어떤 이유에도 통한다. */
@@ -1855,8 +1870,7 @@ async function withModelFallback(run, pick){
       try{ await refreshModels(); }catch{ break; }
       const next = pick();
       if(!next || next === model) break;
-      if(i === 0) toast(`${model.replace(/^models\//,'')} 사용 불가 — 다른 모델로 바꿔요`);
-      renderKeyArea();
+      renderKeyArea();          /* 조용히 바꾼다 — 어떤 모델을 쓰는지는 사용자가 신경 쓸 일이 아니다 */
     }
   }
   throw lastErr || new ApiErr('model','쓸 수 있는 모델을 찾지 못했어요. 설정에서 키를 다시 등록해주세요.');
@@ -2066,7 +2080,9 @@ async function geminiStream(system, parts, schema, model, onText){
     }, body: JSON.stringify({
       systemInstruction:{ parts:[{ text:system }] },
       contents:[{ role:'user', parts:gParts }],
-      generationConfig:{ responseMimeType:'application/json', responseSchema:toGeminiSchema(schema) },
+      /* 상한을 둔다 — 모델이 같은 말을 반복하는 루프에 빠져도 화면을 뒤덮지 않는다.
+         집무실 한 턴 답변엔 넉넉하고, 길어야 하는 브리핑(geminiJSON)에는 걸지 않는다. */
+      generationConfig:{ responseMimeType:'application/json', responseSchema:toGeminiSchema(schema), maxOutputTokens:8192 },
     })});
   }catch{ throw new ApiErr('net','네트워크 오류 — 인터넷 연결을 확인해주세요.'); }
   if(!res.ok){ let msg=''; try{ const e=await res.json(); msg=e?.error?.message; }catch{} throw mapStatus(res,msg); }
