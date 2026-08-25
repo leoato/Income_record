@@ -516,6 +516,20 @@ textarea.inp{resize:none;height:86px;font-size:13.5px;}
 .toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--ink);color:#fff;border-radius:14px;padding:12px 20px;font-size:13px;font-weight:600;z-index:99;opacity:0;transition:all .22s;pointer-events:none;max-width:86%;text-align:center;}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
+/* ══ 앱 정보(만든 사람) ══ */
+.about-card{background:var(--paper);border-radius:14px;padding:4px 16px;box-shadow:var(--shadow);}
+.about-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);font-size:13px;color:var(--ink3);}
+.about-row:last-of-type{border-bottom:none;}
+.about-row b{color:var(--ink);font-weight:700;}
+.about-row a{color:var(--blue);text-decoration:none;font-weight:600;}
+.about-ver{color:var(--ink4);font-weight:600;font-size:11.5px;margin-left:2px;}
+.about-foot{padding:10px 0 12px;text-align:center;font-size:11px;color:var(--ink4);border-top:1px solid var(--line);}
+/* 관보 판권 — 문서 맨 끝의 발행 표기 */
+#ov-brief .gb-colophon{margin:22px 0 6px;padding-top:12px;border-top:1px solid var(--gb-line);
+  display:flex;justify-content:space-between;align-items:baseline;
+  font-family:AppleMyungjo,'Nanum Myeongjo','Noto Serif KR',serif;font-size:11px;color:var(--gb-ink3);letter-spacing:2px;}
+#ov-brief .gb-colophon i{font-style:normal;letter-spacing:1px;}
+
 /* ══ iOS 보정 — 사파리/WKWebView에서만 적용 ══
    입력 글자가 16px 미만이면 포커스 때 화면이 확대된다. 셀렉터 특이성에 밀리지 않게 !important로 못 박는다. */
 @supports (-webkit-touch-callout: none){
@@ -1038,6 +1052,17 @@ body.theme-cream .hdr h1{font-family:'Noto Serif KR',serif;font-weight:900;lette
     <div class="card-lbl">그 외</div>
     <button class="btn ghost" id="themeBtn" style="margin-bottom:8px" onclick="toggleTheme()">테마</button>
     <button class="btn ghost" onclick="openLab()">연출 시험실 — 애니메이션 모아보기</button>
+  </div>
+
+  <div class="set-sec">
+    <div class="card-lbl">앱 정보</div>
+    <div class="about-card">
+      <div class="about-row"><span>앱</span><b>재무부 장관 <span class="about-ver">v1.0</span></b></div>
+      <div class="about-row"><span>만든 사람</span><b>차동균</b></div>
+      <div class="about-row"><span>문의</span><a href="mailto:leoato@naver.com">leoato@naver.com</a></div>
+      <div class="about-row"><span>안내</span><a href="https://leoato.github.io/Income_record/guide.html" target="_blank" rel="noopener">사용 안내 · 개인정보</a></div>
+      <div class="about-foot">© 2026 Dongkyun Cha</div>
+    </div>
   </div>
 </div>
 
@@ -3320,7 +3345,8 @@ function openBrief(id){
     </div></div>
   <div class="bsec"><div class="bsec-h"><span class="tagb">KPI</span></div><div class="kpichips">${b.kpis.map(([l,v])=>`<div class="kchip"><div class="kl">${esc(l)}</div><div class="kv">${esc(v)}</div></div>`).join('')}</div></div>
   <button class="btn ghost" onclick="this.nextElementSibling.classList.toggle('open')">원 문 열 람</button>
-  <div class="fulltext" style="margin-top:10px">${esc(b.full)}</div>`;
+  <div class="fulltext" style="margin-top:10px">${esc(b.full)}</div>
+  <div class="gb-colophon"><span>재무부 장관</span><i>제작 차동균</i></div>`;
   $('bfBody').innerHTML = h;
   openOv('ov-brief');
 }
