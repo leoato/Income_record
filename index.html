@@ -3756,7 +3756,8 @@ async function shrinkShot(file){
     if(s >= 1) return asIs;                        /* 이미 작으면 다시 굽지 않는다 */
     const cv = shotStep(img, Math.max(1, Math.round(w * s)), Math.max(1, Math.round(h * s)));
     const small = cv.toDataURL('image/jpeg', SHOT_Q);
-    if(small.length >= dataUrl.length) return asIs;  /* 드물게 더 커지면 원본을 쓴다 */
+    /* 바이트가 커져도 축소본을 쓴다 — 이미지 비용은 파일 크기가 아니라 가로세로(타일 수)로 매겨진다.
+       압축 잘 된 원본 PNG 가 JPEG 보다 작아도, 픽셀이 줄어든 쪽이 토큰은 싸다. */
     return { b64:small.split(',')[1], mediaType:'image/jpeg', dataUrl:small,
              before:file.size, after:Math.round(small.length * 3 / 4) };
   }catch(e){ return asIs; }                        /* 못 줄여도 정산을 막지는 않는다 */
