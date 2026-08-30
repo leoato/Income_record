@@ -1193,6 +1193,8 @@ const LS = {
   set(k, v){ localStorage.setItem(k, JSON.stringify(v)); },
   del(k){ localStorage.removeItem(k); },
   raw(k){ return localStorage.getItem(k); },
+  /* 배열이어야 하는 키 전용 — 저장소가 오염돼도(깨진 백업 복원 등) 렌더가 죽지 않게 형을 보증한다 */
+  arr(k, fallback=[]){ const v = this.get(k); return Array.isArray(v) ? v : fallback; },
 };
 const incKey = (y,m,d)=>`inc_${y}_${String(m+1).padStart(2,'0')}_${String(d).padStart(2,'0')}`;
 const allIncKeys = ()=>Object.keys(localStorage).filter(k=>/^inc_\d{4}_\d{2}_\d{2}$/.test(k)).sort();
@@ -1217,14 +1219,19 @@ function hasAnyDebt(snaps){ return (snaps||[]).some(s => debtTotalOf(s) > 0); }
 const allBriefIds = ()=>Object.keys(localStorage).filter(k=>k.startsWith('mf_brief_')).map(k=>k.slice(9));
 
 function getSources(){
-  return LS.get('mf_sources', [{ id:'misc', name:'수입', shade:'#3182F6', active:true }]);
+  return LS.arr('mf_sources', [{ id:'misc', name:'수입', shade:'#3182F6', active:true }]);
 }
 function setSources(s){ LS.set('mf_sources', s); }
 function src(id){
   const s = getSources().find(x=>x.id===id);
   return s || { id, name:id, shade:'#8B95A1', active:false };  // 미지 수입원도 표기 가능하게
 }
-function getAsset(ym){ return LS.get(assetKey(ym)); }
+function getAsset(ym){
+  const a = LS.get(assetKey(ym));
+  if(!a || typeof a !== 'object' || Array.isArray(a)) return null;   /* 오염 스냅샷은 없는 것으로 */
+  if(!a.ym) a.ym = ym;                                               /* ym 누락은 키에서 되살린다 */
+  return a;
+}
 function getBrief(id){ return LS.get(briefKey(id)); }
 function saveBrief(b){ LS.set(briefKey(b.id), b); }
 
@@ -1232,10 +1239,10 @@ function saveBrief(b){ LS.set(briefKey(b.id), b); }
 const CHAT_WINDOW = 12;      // API로 보낼 최근 메시지 수 (사용자+장관 합산)
 const NOTES_SEND_MAX = 40;   // API로 보낼 확정 기록 최대 개수
 
-function getChat(){ return LS.get('mf_chat', []); }
+function getChat(){ return LS.arr('mf_chat'); }
 function pushChat(msg){ const c = getChat(); c.push(msg); LS.set('mf_chat', c); return c; }
 function clearChat(){ LS.del('mf_chat'); }
-function getNotes(){ return LS.get('mf_notes', []); }
+function getNotes(){ return LS.arr('mf_notes'); }
 function addNote(text){
   const n = getNotes();
   n.push({ ts:new Date().toISOString(), text:String(text), src:'chat' });
@@ -1258,7 +1265,7 @@ function notesForSend(){
 const DEMO_FLAG = 'mf_demo';
 function isDemo(){ return !!LS.get(DEMO_FLAG); }
 function hasAnyData(){
-  return allAssetYms().length > 0 || allIncKeys().length > 0 || (LS.get('mf_goals')||[]).length > 0;
+  return allAssetYms().length > 0 || allIncKeys().length > 0 || (LS.arr('mf_goals')).length > 0;
 }
 const DEMO_ACCOUNTS = [
   { g:'유동성 · 일상',    n:'주거래 통장',   v:480000 },
@@ -2311,7 +2318,7 @@ function extractSystem(){
 - 대출·마이너스통장 등 '갚아야 할 잔액'은 '부채' 그룹으로 포함한다. 부채도 금액은 양수로 보고한다(부호를 붙이지 않는다).
 - 화면에 표시된 '총 자산' 숫자를 total_displayed로 보고한다. 이 숫자에는 부채가 들어 있지 않다 — 부채는 여기서 빼지도 더하지도 않는다.
 - 계좌 그룹: '유동성 · 일상'(입출금·생활비), '유동성 · 비상금'(비상금 성격 CMA·적금), '유동성 · 적금재원'(목적자금), '강제저축'(청약·적금), '투자'(ISA·연금·주식), '부채'(대출·마이너스통장 — 갚아야 할 잔액). 성격에 맞게 분류한다.
-${extractHint() ? '\n[이 사용자의 계좌 분류 기준]\n'+extractHint() : ''}${(LS.get('mf_accounts')||[]).length ? '\n[알려진 계좌 목록 — 캡처에서 이 이름들을 우선 찾아 같은 이름·그룹으로 보고]\n'+(LS.get('mf_accounts')||[]).map(r=>`- ${r.g}: ${r.n}`).join('\n') : ''}`;
+${extractHint() ? '\n[이 사용자의 계좌 분류 기준]\n'+extractHint() : ''}${LS.arr('mf_accounts').length ? '\n[알려진 계좌 목록 — 캡처에서 이 이름들을 우선 찾아 같은 이름·그룹으로 보고]\n'+LS.arr('mf_accounts').map(r=>`- ${r.g}: ${r.n}`).join('\n') : ''}`;
 }
 
 const BRIEF_SCHEMA = {
@@ -2506,7 +2513,7 @@ function officePayload(){
     const x = getAsset(m) || {};
     return { ym:m, total:x.total, 유동성:x.liq, 투자:x.inv, 강제저축:x.forced };
   });
-  const goals = (LS.get('mf_goals')||[]).map(g=>({
+  const goals = (LS.arr('mf_goals')).map(g=>({
     이름:g.label, 기준:goalBasisLabel(g), 목표:g.target, 기한:g.due||null,
     현재:goalCurrent(g, cur?cur.a:null),
   }));
@@ -2623,7 +2630,7 @@ function applyProp(i, j){
       if(!body) throw new Error('기록할 내용이 비어 있어요.');
       addNote(body);
     }else if(p.kind==='goal_new'){
-      const goals = LS.get('mf_goals') || [];
+      const goals = LS.arr('mf_goals');
       const label = (p.goalLabel || p.label || '').trim();
       if(!label) throw new Error('목표 이름이 비어 있어요.');
       const basis = (p.goalBasis || 'total').trim();
@@ -2648,7 +2655,7 @@ function applyProp(i, j){
       goals.push(g);
       LS.set('mf_goals', goals);
     }else if(p.kind==='goal'){
-      const goals = LS.get('mf_goals') || [];
+      const goals = LS.arr('mf_goals');
       const want = normName(p.goalLabel||'');
       /* 이름이 조금 어긋나도 살린다: 완전일치 → 부분일치 */
       let g = goals.find(x=>normName(x.label)===want);
@@ -3004,6 +3011,7 @@ function renderAn(){
 const normName = n=>String(n||'').replace(/\s/g,'');
 function getAcctReg(){
   let reg = LS.get('mf_accounts');
+  if(!Array.isArray(reg)) reg = null;   /* 오염된 저장값도 최초 구성 경로로 보낸다 */
   if(!reg){
     /* 최초: 가장 최근 정산 스냅샷의 계좌로 자동 구성 */
     const yms = allAssetYms();
@@ -3232,7 +3240,7 @@ function compositionHTML(assets){
 
 /* 목표 카드 — mf_goals: [{label, total|group|account, target, due?}]. 계산은 goalCurrent 한 곳에서만 한다 */
 function goalsHTML(assets){
-  const goals = LS.get('mf_goals')||[];
+  const goals = LS.arr('mf_goals');
   let latest = null;
   for(let i=assets.length-1;i>=0;i--){ if(assets[i].accounts){ latest=assets[i]; break; } }
   if(!latest) latest = assets[assets.length-1] || null;   // 총자산 기준은 계좌 상세가 없어도 계산된다
@@ -3264,7 +3272,7 @@ function goalsHTML(assets){
 /* 목표 추가·수정 — 인자가 있으면 수정 모드 */
 let GOAL_EDIT = -1;
 function openGoalSheet(i){
-  const goals = LS.get('mf_goals')||[];
+  const goals = LS.arr('mf_goals');
   GOAL_EDIT = (typeof i === 'number' && goals[i]) ? i : -1;
   const g = GOAL_EDIT >= 0 ? goals[GOAL_EDIT] : null;
   /* 부채는 '그룹 합계'로 고르면 늘어야 성공인 목표가 되어버린다 — 전용 항목으로 따로 뺀다 */
@@ -3287,7 +3295,7 @@ function saveGoal(){
   if(!label) return toast('목표 이름을 입력해주세요');
   /* 빚 목표는 0원(완제)이 정상이라 금액 0을 막지 않는다 */
   if(basis !== 'debt' && !target) return toast('목표 금액을 입력해주세요');
-  const goals = LS.get('mf_goals')||[];
+  const goals = LS.arr('mf_goals');
   const g = { label, target };
   if(basis === 'debt'){
     g.debt = true;
@@ -3306,7 +3314,7 @@ function saveGoal(){
   toast(GOAL_EDIT >= 0 ? '목표를 수정했어요' : '목표를 추가했어요');
 }
 function deleteGoal(){
-  const goals = LS.get('mf_goals')||[];
+  const goals = LS.arr('mf_goals');
   if(GOAL_EDIT < 0 || !goals[GOAL_EDIT]) return;
   if(!confirm(`'${goals[GOAL_EDIT].label}' 목표를 삭제할까요?`)) return;
   goals.splice(GOAL_EDIT, 1);
@@ -4031,23 +4039,31 @@ function importJSON(input){
   reader.onload = ev=>{
     try{
       const data = JSON.parse(ev.target.result);
-      let count = 0;
+      let count = 0, skipped = 0;
+      /* 형이 안 맞는 값은 저장하지 않는다 — 깨진 백업 하나가 앱을 영영 못 열게 만드는 걸 막는다.
+         (배열이어야 할 키에 문자열, ym 없는 스냅샷 등 — 저장되면 열 때마다 렌더가 죽는다) */
+      const MUST_ARR = /^(mf_goals|mf_notes|mf_chat|mf_accounts|mf_sources)$/;
+      const shapeOk = (k, val)=>{
+        if(MUST_ARR.test(k)) return Array.isArray(val);
+        if(k.startsWith('mf_asset_') || k.startsWith('mf_brief_'))
+          return !!val && typeof val === 'object' && !Array.isArray(val);
+        return true;
+      };
       Object.entries(data).forEach(([k,v])=>{
         if(k.startsWith('_')) return;
         if(/^inc_\d{4}_/.test(k) || k.startsWith('mf_') || k==='amtMode'){
           // 세 포맷 수용: v2 백업(JSON 인코딩 문자열) / 시드·순수 문자열 / 구버전 객체
-          if(typeof v==='string'){
-            try{ JSON.parse(v); localStorage.setItem(k, v); }
-            catch{ localStorage.setItem(k, JSON.stringify(v)); }
-          }else{
-            localStorage.setItem(k, JSON.stringify(v));
-          }
+          let val = v;
+          if(typeof v === 'string'){ try{ val = JSON.parse(v); }catch{ /* 순수 문자열 값 */ } }
+          if(!shapeOk(k, val)){ skipped++; return; }
+          if(k.startsWith('mf_asset_') && !val.ym) val.ym = k.slice(9);   /* 구버전 백업 치유 */
+          localStorage.setItem(k, JSON.stringify(val));
           count++;
         }
       });
       amtMode = localStorage.getItem('amtMode')?.includes('exact') ? 'exact' : 'round';
       renderCal(); renderMin();
-      toast(`${count}개 항목 복원 완료`); closeAllSheets();
+      toast(`${count}개 항목 복원 완료${skipped ? ` · 형식이 안 맞는 ${skipped}개는 건너뜀` : ''}`); closeAllSheets();
     }catch{ toast('파일을 읽을 수 없어요'); }
     input.value='';
   };
