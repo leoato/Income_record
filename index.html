@@ -1808,6 +1808,9 @@ function renderLab(){
    Claude API
 */
 class ApiErr extends Error{ constructor(kind,msg){ super(msg); this.kind=kind; } }
+/* 응답이 '영영 안 오는' 장애(망 블랙홀·프록시 행) 방어 — 오류가 돌아오는 장애는 mapStatus가 받지만,
+   아무것도 안 오면 스피너만 영원히 돈다. 시간이 다 되면 기존 net 오류 경로(재시도 안내)로 떨어진다. */
+const sigTO = ms => (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(ms) : undefined;
 /* 키 접두사로 제공자 자동 감지: AIza…/AQ.… = Google Gemini, sk-ant… = Anthropic Claude
    모르는 형식이면 null → 검증 때 양쪽 다 시도해 되는 쪽으로 확정 (mf_provider에 저장) */
 function keyProvider(key){
@@ -1857,7 +1860,7 @@ async function anthropicJSON(system, parts, schema, modelOverride){
     : { type:'text', text:p.text });
   let res;
   try{
-    res = await fetch('https://api.anthropic.com/v1/messages',{ method:'POST', headers:{
+    res = await fetch('https://api.anthropic.com/v1/messages',{ method:'POST', signal:sigTO(150000), headers:{
       'content-type':'application/json',
       'x-api-key': LS.get('mf_key')||'',
       'anthropic-version':'2023-06-01',
@@ -1869,7 +1872,8 @@ async function anthropicJSON(system, parts, schema, modelOverride){
     })});
   }catch{ throw new ApiErr('net','네트워크 오류 — 인터넷 연결을 확인해주세요.'); }
   if(!res.ok){ let msg=''; try{ const e=await res.json(); msg=e?.error?.message; }catch{} throw mapStatus(res,msg); }
-  const data = await res.json();
+  /* 200이어도 본문이 절단돼 올 수 있다 — 원시 예외를 화면에 내보내지 않는다 */
+  let data; try{ data = await res.json(); }catch{ throw new ApiErr('parse','응답 해석에 실패했어요. 다시 시도해주세요.'); }
   if(data.stop_reason==='refusal') throw new ApiErr('refusal','요청이 안전상 이유로 거절되었어요. 다시 시도해주세요.');
   if(data.stop_reason==='max_tokens') throw new ApiErr('trunc','응답이 잘렸어요. 다시 시도해주세요.');
   return parseJSONOut((data.content||[]).find(b=>b.type==='text')?.text);
@@ -1905,7 +1909,7 @@ async function geminiListModels(key){
   for(const method of ['apikey','bearer']){
     let res;
     try{
-      res = await fetch(`${GEMINI_BASE}/models?pageSize=200`,{ headers:gauthHeaders(key, method) });
+      res = await fetch(`${GEMINI_BASE}/models?pageSize=200`,{ signal:sigTO(20000), headers:gauthHeaders(key, method) });
     }catch{ throw new ApiErr('net','네트워크 오류 — 인터넷 연결을 확인해주세요.'); }
     if(res.ok){
       LS.set('mf_gauth', method);
@@ -2020,7 +2024,7 @@ async function geminiJSON(system, parts, schema, modelOverride){
     : { text:p.text });
   let res;
   try{
-    res = await fetch(`${GEMINI_BASE}/models/${model}:generateContent`,{ method:'POST', headers:{
+    res = await fetch(`${GEMINI_BASE}/models/${model}:generateContent`,{ method:'POST', signal:sigTO(150000), headers:{
       'content-type':'application/json',
       ...gauthHeaders(LS.get('mf_key')||'', LS.get('mf_gauth')||'apikey'),
     }, body: JSON.stringify({
@@ -2030,7 +2034,8 @@ async function geminiJSON(system, parts, schema, modelOverride){
     })});
   }catch{ throw new ApiErr('net','네트워크 오류 — 인터넷 연결을 확인해주세요.'); }
   if(!res.ok){ let msg=''; try{ const e=await res.json(); msg=e?.error?.message; }catch{} throw mapStatus(res,msg); }
-  const data = await res.json();
+  /* 200이어도 본문이 절단돼 올 수 있다 — 원시 예외를 화면에 내보내지 않는다 */
+  let data; try{ data = await res.json(); }catch{ throw new ApiErr('parse','응답 해석에 실패했어요. 다시 시도해주세요.'); }
   if(data.promptFeedback?.blockReason) throw new ApiErr('refusal','요청이 안전상 이유로 거절되었어요. 다시 시도해주세요.');
   const cand = data.candidates?.[0];
   if(cand?.finishReason==='MAX_TOKENS') throw new ApiErr('trunc','응답이 잘렸어요. 다시 시도해주세요.');
@@ -2042,7 +2047,7 @@ async function geminiJSON(system, parts, schema, modelOverride){
 const OPENAI_BASE = 'https://api.openai.com/v1';
 async function openaiListModels(key){
   let res;
-  try{ res = await fetch(`${OPENAI_BASE}/models`,{ headers:{ authorization:'Bearer '+key } }); }
+  try{ res = await fetch(`${OPENAI_BASE}/models`,{ signal:sigTO(20000), headers:{ authorization:'Bearer '+key } }); }
   catch{ throw new ApiErr('net','네트워크 오류 — 인터넷 연결을 확인해주세요.'); }
   if(!res.ok){
     let m=''; try{ const e=await res.json(); m=e?.error?.message||''; }catch{}
@@ -2089,7 +2094,7 @@ async function openaiFetch(system, parts, schema, model, stream){
   for(const loose of [false,true]){
     let res;
     try{
-      res = await fetch(`${OPENAI_BASE}/chat/completions`,{ method:'POST', headers:{
+      res = await fetch(`${OPENAI_BASE}/chat/completions`,{ method:'POST', signal:sigTO(150000), headers:{
         'content-type':'application/json', authorization:'Bearer '+(LS.get('mf_key')||''),
       }, body: JSON.stringify(openaiBody(system,parts,schema,model,stream,loose)) });
     }catch{ throw new ApiErr('net','네트워크 오류 — 인터넷 연결을 확인해주세요.'); }
@@ -2111,7 +2116,8 @@ async function openaiJSON(system, parts, schema, modelOverride){
   const model = modelOverride || briefModel();
   if(!model) throw new ApiErr('model','사용할 모델이 정해지지 않았어요. 설정에서 키를 다시 등록해주세요.');
   const res = await openaiFetch(system, parts, schema, model, false);
-  return parseJSONOut(openaiPickText(await res.json()));
+  let oj; try{ oj = await res.json(); }catch{ throw new ApiErr('parse','응답 해석에 실패했어요. 다시 시도해주세요.'); }
+  return parseJSONOut(openaiPickText(oj));
 }
 async function openaiStream(system, parts, schema, model, onText){
   const res = await openaiFetch(system, parts, schema, model, true);
@@ -2148,7 +2154,7 @@ async function openaiStream(system, parts, schema, model, onText){
 async function anthropicListModels(key){
   let res;
   try{
-    res = await fetch('https://api.anthropic.com/v1/models?limit=100',{ headers:{
+    res = await fetch('https://api.anthropic.com/v1/models?limit=100',{ signal:sigTO(20000), headers:{
       'x-api-key':key, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true',
     }});
   }catch{ throw new ApiErr('net','네트워크 오류 — 인터넷 연결을 확인해주세요.'); }
@@ -2211,7 +2217,7 @@ async function geminiStream(system, parts, schema, model, onText){
     : { text:p.text });
   let res;
   try{
-    res = await fetch(`${GEMINI_BASE}/models/${model}:streamGenerateContent?alt=sse`,{ method:'POST', headers:{
+    res = await fetch(`${GEMINI_BASE}/models/${model}:streamGenerateContent?alt=sse`,{ method:'POST', signal:sigTO(120000), headers:{
       'content-type':'application/json',
       ...gauthHeaders(LS.get('mf_key')||'', LS.get('mf_gauth')||'apikey'),
     }, body: JSON.stringify({
@@ -3203,9 +3209,11 @@ function compositionHTML(assets){
   let latest = null;
   for(let i=assets.length-1;i>=0;i--){ if(assets[i].accounts){ latest=assets[i]; break; } }
   if(!latest) return '';
-  const items = COMP_SLICES.map(s=>({ ...s, v: latest.accounts.filter(a=>a.g===s.g).reduce((sum,a)=>sum+a.v,0) }));
+  /* 부채는 자산 구성이 아니다 — 섞으면 도넛 총자산이 상단 요약과 어긋나고 빚이 자산 조각으로 그려진다 */
+  const assetsOnly = latest.accounts.filter(a=>!isDebt(a.g));
+  const items = COMP_SLICES.map(s=>({ ...s, v: assetsOnly.filter(a=>a.g===s.g).reduce((sum,a)=>sum+a.v,0) }));
   const known = items.reduce((s,x)=>s+x.v,0);
-  const totalAcc = latest.accounts.reduce((s,a)=>s+a.v,0);
+  const totalAcc = assetsOnly.reduce((s,a)=>s+a.v,0);
   if(totalAcc - known > 0) items.push({ label:'기타(미분류)', color:'#8B95A1', v: totalAcc-known });
   const live = items.filter(x=>x.v>0);
   if(!live.length) return '';
@@ -3808,7 +3816,12 @@ async function startExtract(){
   wzSceneStart('wz3body', '장관이 직원들을 소집해 캡처 판독을 지시하고 있어요.<br>수십 초 걸릴 수 있습니다.');
   try{
     const r = await callExtract(WZ.images, WZ.ym);
-    WZ.ext = { total: r.total_displayed, accounts: (r.accounts||[]).map(a=>({ g:a.group, n:a.name, v:a.balance, note:a.note||undefined })) };
+    /* 사용자가 계좌 탭에서 정한 분류가 AI 추측보다 우선한다 — '다음 정산부터 적용돼요' 약속의 이행부 */
+    const reg = getAcctReg();
+    WZ.ext = { total: r.total_displayed, accounts: (r.accounts||[]).map(a=>{
+      const mine = reg.find(x=>normName(x.n)===normName(a.name));
+      return { g: mine ? mine.g : a.group, n:a.name, v:a.balance, note:a.note||undefined };
+    }) };
     if(!WZ.ext.accounts.length) throw new ApiErr('empty','캡처에서 계좌를 찾지 못했어요. 전체 집계 뷰가 포함됐는지 확인해주세요.');
     renderExt();
     wzShow(4);
@@ -4057,11 +4070,15 @@ function importJSON(input){
           if(typeof v === 'string'){ try{ val = JSON.parse(v); }catch{ /* 순수 문자열 값 */ } }
           if(!shapeOk(k, val)){ skipped++; return; }
           if(k.startsWith('mf_asset_') && !val.ym) val.ym = k.slice(9);   /* 구버전 백업 치유 */
+          if(k === 'amtMode'){ localStorage.setItem(k, String(val).replace(/^"|"$/g, '')); count++; return; }
           localStorage.setItem(k, JSON.stringify(val));
           count++;
         }
       });
       amtMode = localStorage.getItem('amtMode')?.includes('exact') ? 'exact' : 'round';
+      /* 토글 알약도 복원값에 맞춘다 — 값만 바꾸면 토글과 실제 표시가 서로 다른 말을 한다 */
+      $('pill-round')?.classList.toggle('on', amtMode === 'round');
+      $('pill-exact')?.classList.toggle('on', amtMode === 'exact');
       renderCal(); renderMin();
       toast(`${count}개 항목 복원 완료${skipped ? ` · 형식이 안 맞는 ${skipped}개는 건너뜀` : ''}`); closeAllSheets();
     }catch{ toast('파일을 읽을 수 없어요'); }
@@ -4070,24 +4087,25 @@ function importJSON(input){
   reader.readAsText(file);
 }
 function exportCSV(){
-  const header = 'date,total,KB,IBK,예비,비상기타,ISA,연금,군인,유동성,투자,강제';
-  const lines = [header];
-  allAssetYms().forEach(ym=>{
+  /* 열은 실제 계좌 이름에서 만든다. 예전의 고정 틀은 초기 개인 구조의 잔재라
+     남의 계좌를 엉뚱한 열에 욱여넣고(급여통장→'비상기타') 부채를 통째로 빠뜨렸다. */
+  const yms = allAssetYms();
+  const names = [];
+  yms.forEach(ym=>{
     const a = getAsset(ym);
-    let cols;
-    if(a.legacy){ cols = a.legacy; }
-    else if(a.accounts){
-      const sumIf = pred=>a.accounts.filter(pred).reduce((s,x)=>s+x.v,0);
-      const kb = sumIf(x=>x.g==='유동성 · 일상' && /급여/.test(x.n));
-      const ibk = sumIf(x=>x.g==='유동성 · 일상' && /생활비/.test(x.n));
-      const yb = sumIf(x=>x.g==='유동성 · 일상' && /예비/.test(x.n));
-      const lockedSaving = sumIf(x=>x.g==='유동성 · 비상금' && /적금|예금/.test(x.n));  // 만기 전 묶인 적금류
-      const purposeFund = sumIf(x=>x.g==='유동성 · 적금재원');
-      const isa = sumIf(x=>/ISA/i.test(x.n)), pension = sumIf(x=>/연금/.test(x.n));
-      const etc = a.liq - kb - ibk - yb - lockedSaving - purposeFund;   // 비상기타 = 즉시가용 CMA + 기타 일상
-      cols = [kb, ibk, yb, etc, isa, pension, 0];
-    } else { cols = ['','','','','','','']; }
-    lines.push([ym, a.total, ...cols, a.liq, a.inv, a.forced].join(','));
+    (a && a.accounts || []).forEach(x=>{
+      if(!names.some(nm=>normName(nm)===normName(x.n))) names.push(x.n);
+    });
+  });
+  const q = s => /[",\n]/.test(String(s)) ? '"'+String(s).replace(/"/g,'""')+'"' : String(s);
+  const lines = [['date','총자산','부채','순자산',...names,'유동성','투자','강제저축'].map(q).join(',')];
+  yms.forEach(ym=>{
+    const a = getAsset(ym);
+    if(!a) return;
+    const accs = a.accounts || [];
+    const val = nm => accs.filter(x=>normName(x.n)===normName(nm)).reduce((s,x)=>s+x.v,0);
+    lines.push([ym, assetTotalOf(a), debtTotalOf(a), netOf(a),
+      ...names.map(nm=>accs.length?val(nm):''), a.liq??'', a.inv??'', a.forced??''].map(q).join(','));
   });
   const blob = new Blob(['﻿'+lines.join('\n')],{type:'text/csv'});
   const url = URL.createObjectURL(blob);
