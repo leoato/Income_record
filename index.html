@@ -1241,7 +1241,10 @@ const NOTES_SEND_MAX = 40;   // API로 보낼 확정 기록 최대 개수
 
 function getChat(){ return LS.arr('mf_chat'); }
 function pushChat(msg){ const c = getChat(); c.push(msg); LS.set('mf_chat', c); return c; }
-function clearChat(){ LS.del('mf_chat'); }
+/* 대화를 지우면 세션 번호가 올라간다 — 진행 중이던 요청의 늦은 답변은 이 번호가 어긋나 버려진다.
+   (없을 땐 초기화한 대화에 '질문 없는 장관 답변'만 유령처럼 되살아나고 그 제안의 재가까지 먹혔다) */
+let CHAT_RUN = 0;
+function clearChat(){ CHAT_RUN++; LS.del('mf_chat'); }
 function getNotes(){ return LS.arr('mf_notes'); }
 function addNote(text){
   const n = getNotes();
@@ -1341,7 +1344,8 @@ function loadDemoData(){
   toast('데모 데이터를 채웠어요 — 모든 화면을 둘러볼 수 있어요');
 }
 function clearDemoData(){
-  if(!confirm('데모 데이터를 지울까요?')) return;
+  /* 이 버튼은 앱 데이터를 통째로 지운다 — '데모만' 지운다고 오해하지 않게 정확히 말한다 */
+  if(!confirm('데모 데이터를 지울까요?\n\n앱에 저장된 기록(정산·브리핑·목표·수입)이 함께 지워집니다.\n되돌릴 수 없어요.')) return;
   clearAppData();
   go('cal');
   toast('데모 데이터를 지웠어요');
@@ -2572,10 +2576,28 @@ function go(tab){
   if(tab==='acct') renderAcct();
   if(tab==='min') renderMin();
 }
-function openSheet(id){ $('bd').classList.add('open'); $(id).classList.add('open'); }
-function closeAllSheets(){ $('bd').classList.remove('open'); document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('open')); }
-function openOv(id){ $(id).classList.add('open'); }
-function closeOv(id){ $(id).classList.remove('open'); }
+/* 뒤로가기(안드로이드 하드웨어 버튼·브라우저 제스처)가 앱을 통째로 빠져나가지 않게,
+   시트·오버레이가 열릴 때 히스토리 항목을 하나 쌓고 popstate 로 그것만 닫는다.
+   (없을 땐 판독까지 끝낸 정산 중에 뒤로가기 한 번으로 앱을 나가 캡처·판독 결과가 전부 날아갔다) */
+let UI_DEPTH = 0;
+function uiPush(){ UI_DEPTH++; try{ history.pushState({ mfDepth: UI_DEPTH }, ''); }catch(e){} }
+function uiSettle(){
+  const open = document.querySelectorAll('.sheet.open, .ovpage.open').length;
+  if(open === 0) UI_DEPTH = 0;
+}
+function openSheet(id){ if(!$(id).classList.contains('open')) uiPush(); $('bd').classList.add('open'); $(id).classList.add('open'); }
+function closeAllSheets(){ $('bd').classList.remove('open'); document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('open')); uiSettle(); }
+function openOv(id){ if(!$(id).classList.contains('open')) uiPush(); $(id).classList.add('open'); }
+function closeOv(id){ $(id).classList.remove('open'); uiSettle(); }
+addEventListener('popstate', ()=>{
+  /* 가장 위에 있는 것부터 하나 닫는다 — 마법사는 자체 정리(요청 무효화)를 타게 exitWizard 로 */
+  const wiz = $('ov-wizard');
+  if(wiz && wiz.classList.contains('open')){ exitWizard(); return; }
+  const ov = [...document.querySelectorAll('.ovpage.open')].pop();
+  if(ov){ ov.classList.remove('open'); uiSettle(); return; }
+  if(document.querySelector('.sheet.open')){ closeAllSheets(); return; }
+  UI_DEPTH = 0;
+});
 
 /* 집무실 */
 function chatRowHTML(m, i){
@@ -2760,14 +2782,17 @@ async function sendOffice(isRetry){
     txEl.textContent = s;
     b.scrollTop = b.scrollHeight;
   };
+  const myChat = CHAT_RUN;
   try{
     const r = await callOffice(onText);
+    if(myChat !== CHAT_RUN){ renderChat(); return; }   /* 그 사이 대화를 지웠다 — 답변을 되살리지 않는다 */
     pushChat({
       r:'a', t:r.reply, ts:new Date().toISOString(),
       props:(r.proposals||[]).map(p=>({ ...p, state:'pending' })),
     });
     renderChat();                                 // 제안 카드는 JSON이 끝나야 붙는다
   }catch(e){
+    if(myChat !== CHAT_RUN){ renderChat(); return; }
     const live = document.getElementById('chatLive');
     if(live) live.remove();
     const msg = (e && e.message) ? e.message : '전송에 실패했어요.';
@@ -3679,8 +3704,12 @@ function toggleAct(id,i,el){
 /*
    정산 마법사
 */
-const WZ = { step:1, ym:null, images:[], ext:null, assetSaved:false };
+const WZ = { step:1, ym:null, images:[], ext:null, assetSaved:false, run:0 };
+/* 정산을 나가거나 다시 시작하면 run 이 올라간다. 취소한 요청의 늦은 응답은 이 번호가 어긋나 버려진다.
+   (없을 땐 ✕로 나갔다 다시 시작한 마법사가 4초 뒤 혼자 '추출 결과 확인'으로 튀었다) */
+function wzLive(id){ return WZ.run === id && $('ov-wizard').classList.contains('open'); }
 function startWizard(){
+  WZ.run++;                     /* 새 세션 — 이전 요청의 늦은 응답과 섞이지 않는다 */
   WZ.step=1; WZ.ym=targetYm(); WZ.images=[]; WZ.ext=null; WZ.assetSaved=false;
   $('thumbs').innerHTML=''; $('shotNote').textContent=''; $('wz2next').disabled=true;
   $('noteText').value=''; document.querySelectorAll('#noteChips .chip').forEach(c=>c.classList.remove('on'));
@@ -3688,6 +3717,14 @@ function startWizard(){
   wzShow(1); openOv('ov-wizard');
 }
 function exitWizard(){
+  /* 캡처를 올렸거나 판독까지 끝낸(=API를 한 번 쓴) 상태면 한 번 묻는다.
+     모바일 뒤로 스와이프는 실수로 쉽게 나가고, 그때 잃는 건 돈과 시간이다. */
+  if(!WZ.assetSaved && (WZ.images.length || WZ.ext) &&
+     !confirm('정산을 그만둘까요?\n\n올린 캡처와 판독 결과가 사라집니다.')) {
+    if($('ov-wizard').classList.contains('open')) uiPush();   /* 취소했으니 히스토리를 되돌린다 */
+    return;
+  }
+  WZ.run++;                     /* 진행 중이던 요청의 응답을 무효화 */
   wzSceneStop();
   closeOv('ov-wizard');
   if(WZ.assetSaved){ renderAsset(); renderMin(); }
@@ -3812,10 +3849,12 @@ function removeThumb(i){ WZ.images.splice(i,1); renderThumbs(); }
 
 /* 판독 */
 async function startExtract(){
+  const myRun = WZ.run;
   wzShow(3);
   wzSceneStart('wz3body', '장관이 직원들을 소집해 캡처 판독을 지시하고 있어요.<br>수십 초 걸릴 수 있습니다.');
   try{
     const r = await callExtract(WZ.images, WZ.ym);
+    if(!wzLive(myRun)) return;                 /* 그 사이 나갔거나 다시 시작했다 — 조용히 버린다 */
     /* 사용자가 계좌 탭에서 정한 분류가 AI 추측보다 우선한다 — '다음 정산부터 적용돼요' 약속의 이행부 */
     const reg = getAcctReg();
     WZ.ext = { total: r.total_displayed, accounts: (r.accounts||[]).map(a=>{
@@ -3826,6 +3865,7 @@ async function startExtract(){
     renderExt();
     wzShow(4);
   }catch(e){
+    if(!wzLive(myRun)) return;
     wzSceneStop();
     $('wz3body').innerHTML = `<div class="err-box">${esc(e.message||'판독 실패')}</div>
       <button class="btn" onclick="startExtract()">다시 시도</button>
@@ -3900,6 +3940,9 @@ function confirmExtract(){
   const emerg = sumBy(a=>a.g==='유동성 · 비상금');
   const total = extSum();
   LS.set(assetKey(WZ.ym), { ym:WZ.ym, total, liq, inv, forced, emerg, accounts, seed:false, savedAt:new Date().toISOString() });
+  /* 직접 정산한 순간부터는 '둘러보기 중'이 아니다 — 이 표시를 남겨두면
+     나중에 [데모 데이터 지우기] 한 번에 진짜 기록까지 함께 지워진다 */
+  if(LS.get(DEMO_FLAG)){ LS.del(DEMO_FLAG); renderDemoRow?.(); }
   syncAcctReg(accounts);          // 새 계좌를 등록부에 자동 반영
   WZ.assetSaved = true;
   wzShow(5);
@@ -3911,17 +3954,20 @@ function collectNotes(){
   return [chips.join(', '), text].filter(Boolean).join(' / ');
 }
 async function startBrief(){
+  const myRun = WZ.run;
   wzShow(6);
   const briefNotes = collectNotes();
   wzBriefScene('wz6body', '전월 대비 변동을 계산하고 로드맵과 대조해<br>브리핑을 작성하고 있어요. 1~3분 걸릴 수 있습니다.', briefNotes);
   try{
     const asset = getAsset(WZ.ym);
     const r = await callBrief(WZ.ym, asset, briefNotes);
+    if(!wzLive(myRun)) return;                 /* 취소된 세션의 응답 — 화면을 되돌리지 않는다 */
     saveBrief(makeBrief(WZ.ym, r));
     $('wzDoneTitle').textContent = `${ymLabel(WZ.ym)} 정산 완료`;
     wzShow(7);
     playDiorama();
   }catch(e){
+    if(!wzLive(myRun)) return;
     wzSceneStop();
     $('wz6body').innerHTML = `<div class="err-box">${esc(e.message||'브리핑 생성 실패')}<br><br>자산 스냅샷은 이미 저장됐어요 — 브리핑만 다시 요청하면 됩니다.</div>
       <button class="btn" onclick="startBrief()">브리핑 다시 요청</button>
@@ -4035,7 +4081,11 @@ function addSource(){
 /* 데이터 관리 */
 function exportJSON(){
   const data = { _app:'재무부장관', _ver:2, _exportedAt:new Date().toISOString() };
+  /* API 키는 백업에 넣지 않는다 — 설정 화면이 '이 기기에만 저장된다'고 약속하고,
+     백업 파일은 클라우드·메신저로 옮겨다니므로 키가 새면 남이 내 한도로 호출하게 된다. */
+  const SECRET = /^(mf_key|mf_gauth)$/;
   Object.keys(localStorage).forEach(k=>{
+    if(SECRET.test(k)) return;
     if(/^inc_\d{4}_/.test(k) || k.startsWith('mf_') || k==='amtMode') data[k] = LS.raw(k);
   });
   const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
@@ -4044,7 +4094,7 @@ function exportJSON(){
   const now = new Date();
   a.href=url; a.download=`재무부장관_백업_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}.json`;
   a.click(); URL.revokeObjectURL(url);
-  toast('백업 파일 저장 완료'); closeAllSheets();
+  toast('백업 저장 완료 — API 키는 빠져 있어요(새 기기에서 다시 등록)'); closeAllSheets();
 }
 function importJSON(input){
   const file = input.files[0]; if(!file) return;
@@ -4068,6 +4118,7 @@ function importJSON(input){
           // 세 포맷 수용: v2 백업(JSON 인코딩 문자열) / 시드·순수 문자열 / 구버전 객체
           let val = v;
           if(typeof v === 'string'){ try{ val = JSON.parse(v); }catch{ /* 순수 문자열 값 */ } }
+          if(/^(mf_key|mf_gauth)$/.test(k)) return;     /* 남의 백업으로 키가 설치되지 않게 */
           if(!shapeOk(k, val)){ skipped++; return; }
           if(k.startsWith('mf_asset_') && !val.ym) val.ym = k.slice(9);   /* 구버전 백업 치유 */
           if(k === 'amtMode'){ localStorage.setItem(k, String(val).replace(/^"|"$/g, '')); count++; return; }
